@@ -706,19 +706,19 @@
 趯罍鼱鳠鳡鳣爟爚灈韂糵礵鹴皭龢鳤亹籥𫚭玃醾齇觿" ""))
   "常用汉字")
 
-(defun pyim-pymap-sort-cchar (a b)
-  "对汉字 A 和 B 按照使用频率排序。"
+(defun pyim-pymap-cchar< (a b)
+  "如果汉字 A 的使用频率大于汉字 B 的使用频率时，返回 non-nil"
   (< (or (cl-position a pyim-pymap-commonly-used-cchar :test #'equal) 1000000)
      (or (cl-position b pyim-pymap-commonly-used-cchar :test #'equal) 1000000)))
 
 (defun pyim-pymap-sort-pymap ()
-  "对 `pyim-pymap' 的取值进行排序, 用于维护 pyim-pymap."
+  "对 `pyim-pymap' 重新排序, 这个函数主要用于维护 `pyim-pymap'."
   (let (pymap)
     (dolist (py pyim-pymap)
       (push (list (car py)
                   (mapconcat #'identity
                              (sort (split-string (cadr py) "")
-                                   #'pyim-pymap-sort-cchar)
+                                   #'pyim-pymap-cchar<)
                              ""))
             pymap))
     (reverse pymap)))
