@@ -3834,14 +3834,17 @@ PUNCT-LIST 格式类似：
 (defun pyim-cregexp-build (string)
   "根据 STRING 构建一个中文 regexp, 用于 \"拼音搜索汉字\".
 比如：\"nihao\" -> \"[你呢...][好号...] \\| nihao\""
-  (or (ignore-errors
-        (rx-to-string (pyim-cregexp-build-from-rx
-                       (lambda (x)
-                         (if (stringp x)
-                             (xr (pyim-cregexp-build-1 x))
-                           x))
-                       (xr string))))
-      string))
+  ;; FIXME: (rx-to-string "") => "\\(?:\\)"
+  (if (equal string "")
+      string
+    (or (ignore-errors
+          (rx-to-string (pyim-cregexp-build-from-rx
+                         (lambda (x)
+                           (if (stringp x)
+                               (xr (pyim-cregexp-build-1 x))
+                             x))
+                         (xr string))))
+        string)))
 
 (defun pyim-cregexp-build-from-rx (fn rx-form)
   (cond
@@ -3864,11 +3867,10 @@ PUNCT-LIST 格式类似：
          (class (pyim-scheme-get-option scheme-name :class))
          (code-prefix (pyim-scheme-get-option scheme-name :code-prefix))
          (sep "#####&&&&#####")
-         (lst (split-string
-               (replace-regexp-in-string
-                "\\([a-z']+\\)" (concat sep "\\1" sep) str)
-               sep))
-         (lst (remove "" lst)))
+         (lst (remove "" (split-string
+                          (replace-regexp-in-string
+                           "\\([a-z]+'*\\)" (concat sep "\\1" sep) str)
+                          sep))))
     ;; 确保 pyim 词库加载
     (pyim-dcache-init-variables)
     ;; pyim 暂时只支持全拼和双拼搜索
@@ -3876,16 +3878,12 @@ PUNCT-LIST 格式类似：
       (setq scheme-name pyim-cregexp-fallback-scheme))
     (mapconcat
      (lambda (string)
-       (if (or (pyim-string-match-p "[^a-z']+" string))
+       (if (or (pyim-string-match-p "[^a-z']+" string)
+               (equal string ""))
            string
-         (let* ((imobjs
-                 ;; 如果一个字符串以'结尾,就按照拼音首字母字符串处理。
-                 (if (pyim-string-match-p "'$" string)
-                     (list (mapcar #'(lambda (x)
-                                       (list (char-to-string x)))
-                                   (string-to-list string)))
-                   ;; Slowly operating, need to improve.
-                   (pyim-imobjs-create string scheme-name)))
+         (let* ((imobjs (pyim-imobjs-create
+                         (replace-regexp-in-string "'" "" string)
+                         scheme-name))
                 (regexp-list
                  (mapcar
                   #'(lambda (imobj)
@@ -4005,9 +4003,7 @@ PUNCT-LIST 格式类似：
                             (cdr y))
                     (list (pyim-cregexp-build (car y)))))
                 x)
-      (if (string= "" x)
-          x
-        (pyim-cregexp-build x)))))
+      (pyim-cregexp-build x))))
 
 (defun pyim-convert-cregexp-at-point (&optional insert-only)
   "将光标前的字符串按拼音的规则转换为一个搜索中文的 regexp.
