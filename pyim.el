@@ -7,7 +7,7 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 3.4
+;; Version: 3.5
 ;; Keywords: convenience, Chinese, pinyin, input-method
 ;; Package-Requires: ((emacs "24.4") (async "1.6") (xr "1.13"))
 
@@ -3902,7 +3902,9 @@ PUNCT-LIST 格式类似：
                               "\\|")))
                 (regexp
                  (if (> (length regexp) 0)
-                     (concat string "\\|" string1 "\\|" regexp)
+                     (if (equal string string1)
+                         (concat string "\\|" regexp)
+                       (concat string "\\|" string1 "\\|" regexp))
                    string)))
            (format "\\(?:%s\\)" regexp))))
      lst "")))
