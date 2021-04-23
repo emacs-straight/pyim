@@ -29,7 +29,12 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 
-(defcustom pyim-exhibit-delay-ms 0
+(defgroup pyim-entered nil
+  "Entered tools for pyim."
+  :group 'pyim)
+
+(define-obsolete-variable-alias 'pyim-exhibit-delay-ms 'pyim-entered-exhibit-delay-ms "")
+(defcustom pyim-entered-exhibit-delay-ms 0
   "输入或者删除拼音字符后等待多少毫秒后才显示可选词
 当用户快速输入连续的拼音时可提升用户体验.
 如果为 0 或者 nil, 则不等待立刻显示可选词."
@@ -70,7 +75,7 @@ TYPE 取值为 point-after, 返回 entered buffer 中 point 之后的字符
 串。"
   (pyim-with-entered-buffer
     (cond
-     ((equal 1 (point))
+     ((equal (point-min) (point))
       (buffer-string))
      ((eq type 'point-before)
       (buffer-substring-no-properties 1 (point)))
@@ -247,18 +252,18 @@ TYPE 取值为 point-after, 返回 entered buffer 中 point 之后的字符
           (pyim-page-refresh))))))
 
 (defun pyim-entered-refresh (&optional no-delay)
-  "延迟 `pyim-exhibit-delay-ms' 显示备选词等待用户选择。"
+  "延迟 `pyim-entered-exhibit-delay-ms' 显示备选词等待用户选择。"
   (if (= (length (pyim-entered-get 'point-before)) 0)
       (pyim-terminate-translation)
     (when pyim-entered--exhibit-timer
       (cancel-timer pyim-entered--exhibit-timer))
     (cond
      ((or no-delay
-          (not pyim-exhibit-delay-ms)
-          (eq pyim-exhibit-delay-ms 0))
+          (not pyim-entered-exhibit-delay-ms)
+          (eq pyim-entered-exhibit-delay-ms 0))
       (pyim-entered-refresh-1))
      (t (setq pyim-entered--exhibit-timer
-              (run-with-timer (/ pyim-exhibit-delay-ms 1000.0)
+              (run-with-timer (/ pyim-entered-exhibit-delay-ms 1000.0)
                               nil
                               #'pyim-entered-refresh-1))))))
 
@@ -291,10 +296,6 @@ TYPE 取值为 point-after, 返回 entered buffer 中 point 之后的字符
   "`pyim-entered-buffer’ 中向前删除一个 imelem 对应的字符串"
   (interactive)
   (pyim-entered-delete-backward-imelem t))
-
-(define-obsolete-function-alias
-  'pyim-convert-code-at-point #'pyim-convert-string-at-point "2.0")
-
 
 ;; * Footer
 (provide 'pyim-entered)

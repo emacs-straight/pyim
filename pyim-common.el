@@ -31,6 +31,10 @@
 ;;; Code:
 ;; * 代码                                                                 :code:
 
+(defgroup pyim-common nil
+  "pyim common."
+  :group 'pyim)
+
 (defvar pyim-debug nil)
 
 (defun pyim-string-match-p (regexp string &optional start)
@@ -82,13 +86,6 @@
                 return)))
       (setq one return)
       (pyim-permutate-list2-internal one (cdr two)))))
-
-(defun pyim-flatten-list (my-list)
-  (cond
-   ((null my-list) nil)
-   ((atom my-list) (list my-list))
-   (t (append (pyim-flatten-list (car my-list))
-              (pyim-flatten-list (cdr my-list))))))
 
 (defun pyim-list-merge (a b)
   "Join list A and B to a new list, then delete dups."

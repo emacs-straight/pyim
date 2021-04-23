@@ -42,7 +42,8 @@
 (require 'pyim-dict)
 (require 'pyim-dcache)
 (require 'pyim-scheme)
-(require 'pyim-imobjs-codes)
+(require 'pyim-imobjs)
+(require 'pyim-codes)
 (require 'pyim-page)
 (require 'pyim-entered)
 (require 'pyim-candidates)
@@ -65,12 +66,12 @@
 运行结果为 t 时，pyim 开启英文输入功能。"
   :type 'symbol)
 
-(define-obsolete-variable-alias 'pyim-page-select-finish-hook 'pyim-select-finish-hook "3.0")
+(define-obsolete-variable-alias 'pyim-page-select-finish-hook 'pyim-select-finish-hook "4.0")
 (defcustom pyim-select-finish-hook nil
   "Pyim 选词完成时运行的 hook."
   :type 'hook)
 
-(define-obsolete-variable-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "3.0")
+(define-obsolete-variable-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "4.0")
 (defcustom pyim-select-word-by-number t
   "使用数字键来选择词条.
 
@@ -82,6 +83,13 @@
   "将 “待选词条” 在 “上屏” 之前自动转换为其他字符串.
 这个功能可以实现“简转繁”，“输入中文得到英文”之类的功能。"
   :type 'boolean)
+
+(defcustom pyim-wash-function 'pyim-wash-current-line-function
+  "清洗光标前面的文字内容.
+这个函数与『单字快捷键配合使用』，当光标前面的字符为汉字字符时，
+按 `pyim-outcome-trigger-char' 对应字符，可以调用这个函数来清洗
+光标前面的文字内容。"
+  :type 'function)
 
 ;;;###autoload
 (defvar pyim-titles '("PYIM " "PYIM-EN " "PYIM-AU ") "Pyim 在 mode-line 中显示的名称.")
@@ -188,7 +196,7 @@
 
 pyim 是使用 `pyim-start' 来启动输入法，这个命令主要做如下工作：
 1. 重置 `pyim-local-variable-list' 中所有的 local 变量。
-2. 使用 `pyim-cchar2pinyin-create-cache' 创建汉字到拼音的 hash table 对应表。
+2. 使用 `pyim-pymap-cchar2py-create-cache' 创建汉字到拼音的 hash table 对应表。
 3. 运行hook： `pyim-load-hook'。
 4. 将 `pyim-dcache-save-caches' 命令添加到 `kill-emacs-hook' , emacs 关闭
 之前将用户选择过的词生成的缓存和词频缓存保存到文件，供以后使用。
@@ -215,8 +223,8 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
   (when pyim-dcache-auto-update
     (pyim-dcache-call-api 'update-personal-words restart))
 
-  (pyim-cchar2pinyin-cache-create)
-  (pyim-pinyin2cchar-cache-create)
+  (pyim-pymap-cchar2py-cache-create)
+  (pyim-pymap-py2cchar-cache-create)
   (run-hooks 'pyim-load-hook)
 
   (when pyim-dcache-auto-update
@@ -458,6 +466,33 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
             result))
     str))
 
+(defun pyim-wash-current-line-function ()
+  "清理当前行的内容，比如：删除不必要的空格，等。"
+  (interactive)
+  (let* ((begin (line-beginning-position))
+         (end (point))
+         (string (buffer-substring-no-properties begin end))
+         new-string)
+    (when (> (length string) 0)
+      (delete-region begin end)
+      (setq new-string
+            (with-temp-buffer
+              (insert string)
+              (goto-char (point-min))
+              (while (re-search-forward "\\([，。；？！；、）】]\\)  +\\([[:ascii:]]\\)" nil t)
+                (replace-match (concat (match-string 1) (match-string 2))  nil t))
+              (goto-char (point-min))
+              (while (re-search-forward "\\([[:ascii:]]\\)  +\\([（【]\\)" nil t)
+                (replace-match (concat (match-string 1) (match-string 2))  nil t))
+              (goto-char (point-min))
+              (while (re-search-forward "\\([[:ascii:]]\\)  +\\(\\cc\\)" nil t)
+                (replace-match (concat (match-string 1) " " (match-string 2))  nil t))
+              (goto-char (point-min))
+              (while (re-search-forward "\\(\\cc\\)  +\\([[:ascii:]]\\)" nil t)
+                (replace-match (concat (match-string 1) " " (match-string 2))  nil t))
+              (buffer-string)))
+      (insert new-string))))
+
 (defun pyim-start-translation (key)
   "Start translation of the typed character KEY-OR-STRING by pyim.
 Return the input string.
@@ -617,7 +652,7 @@ Return the input string.
           (not pyim-assistant-scheme-enable))
     (pyim-entered-refresh)))
 
-(define-obsolete-function-alias 'pyim-page-select-word-simple 'pyim-select-word-simple "3.0")
+(define-obsolete-function-alias 'pyim-page-select-word-simple 'pyim-select-word-simple "4.0")
 (defun pyim-select-word-simple ()
   "从选词框中选择当前词条.
 这个函数与 `pyim-select-word' 的区别是：
@@ -631,7 +666,7 @@ Return the input string.
     (pyim-outcome-handle 'candidate))
   (pyim-terminate-translation))
 
-(define-obsolete-function-alias 'pyim-page-select-word 'pyim-select-word "3.0")
+(define-obsolete-function-alias 'pyim-page-select-word 'pyim-select-word "4.0")
 (defun pyim-select-word ()
   "从选词框中选择当前词条，然后删除该词条对应拼音。"
   (interactive)
@@ -735,7 +770,7 @@ Return the input string.
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
 
-(define-obsolete-function-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "3.0")
+(define-obsolete-function-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "4.0")
 (defun pyim-select-word-by-number (&optional n)
   "使用数字编号来选择对应的词条。"
   (interactive)
@@ -759,6 +794,9 @@ Return the input string.
     (call-interactively #'pyim-self-insert-command)))
 
 ;;;###autoload
+(define-obsolete-function-alias
+  'pyim-convert-code-at-point #'pyim-convert-string-at-point "2.0")
+
 (defun pyim-convert-string-at-point (&optional return-cregexp)
   "将光标前的用户输入的字符串转换为中文.
 

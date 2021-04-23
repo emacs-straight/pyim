@@ -28,6 +28,11 @@
 ;;; Code:
 ;; * 代码                                                           :code:
 (require 'cl-lib)
+(require 'pyim-pymap)
+
+(defgroup pyim-pinyin nil
+  "Pinyin libs for pyim."
+  :group 'pyim)
 
 (defvar pyim-pinyin-shenmu
   '("b" "p" "m" "f" "d" "t" "n" "l" "g" "k" "h"
@@ -43,7 +48,7 @@
   '("a" "o" "e" "ai" "ei" "ui" "ao" "ou" "er" "an" "en"
     "ang" "eng"))
 
-(define-obsolete-function-alias 'pyim-fuzzy-pinyin-alist 'pyim-pinyin-fuzzy-alist "3.0")
+(define-obsolete-function-alias 'pyim-fuzzy-pinyin-alist 'pyim-pinyin-fuzzy-alist "4.0")
 (defcustom pyim-pinyin-fuzzy-alist
   '(("en" "eng")
     ("in" "ing")
@@ -114,7 +119,7 @@
                (shenmu yunmu)
                (cl-some
                 #'(lambda (char-pinyin)
-                    (pyim-pinyin2cchar-get char-pinyin t))
+                    (pyim-pymap-py2cchar-get char-pinyin t))
                 (mapcar #'(lambda (x)
                             (concat (nth 0 x) (nth 1 x)))
                         (pyim-imobjs-find-fuzzy:quanpin-1

@@ -29,6 +29,10 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 
+(defgroup pyim-cstring nil
+  "Chinese string tools for pyim."
+  :group 'pyim)
+
 (defun pyim-cstring-at-point (&optional number)
   "获取光标一个中文字符串，字符数量为：NUMBER."
   (save-excursion
@@ -248,7 +252,7 @@ BUG: 当 STRING 中包含其它标点符号，并且设置 SEPERATER 时，结�
              (push (list str) pinyins-list))
             ((and (> (length str) 0)
                   (pyim-string-match-p "\\cc" str))
-             (push (pyim-cchar2pinyin-get (string-to-char str))
+             (push (pyim-pymap-cchar2py-get (string-to-char str))
                    pinyins-list))
             ((> (length str) 0)
              (push (list str) pinyins-list))))

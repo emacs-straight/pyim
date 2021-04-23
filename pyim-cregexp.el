@@ -32,6 +32,10 @@
 (require 'xr)
 (require 'rx)
 
+(defgroup pyim-cregexp nil
+  "Chinese regexp tools for pyim."
+  :group 'pyim)
+
 (defcustom pyim-cregexp-fallback-scheme 'quanpin
   "`pyim-cregexp-build' 使用的 Fallback scheme.
 
@@ -151,7 +155,7 @@
                                      (mapconcat #'identity
                                                 (cl-subseq (split-string x "|") 0 char-level-num)
                                                 ""))
-                                 (pyim-pinyin2cchar-get py equal-match nil t) "")))
+                                 (pyim-pymap-py2cchar-get py equal-match nil t) "")))
                 (push cchars results))
               (setq n (+ 1 n)))
             (nreverse results)))

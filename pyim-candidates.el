@@ -30,9 +30,14 @@
 (require 'cl-lib)
 (require 'pyim-common)
 (require 'pyim-dcache)
-(require 'pyim-imobjs-codes)
+(require 'pyim-imobjs)
+(require 'pyim-codes)
 (require 'pyim-page)
 (require 'pyim-preview)
+
+(defgroup pyim-candidates nil
+  "Candidates of pyim."
+  :group 'pyim)
 
 (defvar pyim-candidates nil
   "所有备选词条组成的列表.")

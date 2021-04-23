@@ -2,32 +2,6 @@
 #+TITLE: A Chinese input method support quanpin, shuangpin, wubi and cangjie.
 #+AUTHOR: Feng Shu
 
-* Header
-Copyright (C) 2015-2021 Free Software Foundation, Inc.
-
-Author: Ye Wenbin <wenbinye@163.com>
-        Feng Shu <tumashu@163.com>
-Maintainer: Feng Shu <tumashu@163.com>
-URL: https://github.com/tumashu/pyim
-Version: 3.6
-Keywords: convenience, Chinese, pinyin, input-method
-Package-Requires: ((emacs "24.4") (async "1.6") (xr "1.13"))
-
-This file is part of GNU Emacs.
-
-GNU Emacs is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-GNU Emacs is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
-
 * pyim 使用说明                                                      :README:doc:
 ** 截图
 [[file:./snapshots/pyim-linux-x-with-toolkit.png]]
@@ -175,7 +149,7 @@ pyim 支持双拼输入模式，用户可以通过变量 `pyim-default-scheme' �
 注意：
 1. pyim 支持微软双拼（microsoft-shuangpin）和小鹤双拼（xiaohe-shuangpin）。
 2. 用户可以使用函数 `pyim-scheme-add' 添加自定义双拼方案。
-3. 用户可能需要重新设置 `pyim-translate-trigger-char'。
+3. 用户可能需要重新设置 `pyim-outcome-trigger-char'。
 
 *** 使用 rime 输入法
 具体安装和使用方式请查看 pyim-liberime 包的 Commentary 部分。
@@ -296,14 +270,14 @@ pyim 的 tooltip 选词框默认使用 *双行显示* 的样式，在一些特
    #+end_example
 2. 第二种方法：使用命令 `pyim-punctuation-translate-at-point' 只切换光
    标处标点的样式。
-3. 第三种方法：设置变量 `pyim-translate-trigger-char' ，输入变量设定的
+3. 第三种方法：设置变量 `pyim-outcome-trigger-char' ，输入变量设定的
    字符会切换光标处标点的样式。
 
 *** 手动加词和删词
 
 1. `pyim-create-Ncchar-word-at-point 这是一组命令，从光标前提取N个汉
    字字符组成字符串，并将其加入个人词库。
-2. `pyim-translate-trigger-char' 以默认设置为例：在“我爱吃红烧肉”后输
+2. `pyim-outcome-trigger-char' 以默认设置为例：在“我爱吃红烧肉”后输
    入“5v” 可以将“爱吃红烧肉”这个词条保存到用户个人词库。
 3. `pyim-create-word-from-selection', 选择一个词条，运行这个命令后，就
    可以将这个词条添加到个人词库。

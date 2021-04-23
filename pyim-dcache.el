@@ -29,6 +29,11 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 (require 'pyim-common)
+(require 'pyim-dict)
+
+(defgroup pyim-dcache nil
+  "Dcache for pyim."
+  :group 'pyim)
 
 (defcustom pyim-dcache-backend 'pyim-dhashcache
   "词库后端引擎.负责缓冲词库并提供搜索词的算法.
@@ -39,7 +44,7 @@
 在六年历史的笔记本上会有一秒的延迟. 这时建议换用 `pyim-dhashcache'."
   :type 'symbol)
 
-(define-obsolete-variable-alias 'pyim-prefer-emacs-thread 'pyim-dcache-prefer-emacs-thread "3.0")
+(define-obsolete-variable-alias 'pyim-prefer-emacs-thread 'pyim-dcache-prefer-emacs-thread "4.0")
 (defvar pyim-dcache-prefer-emacs-thread nil
   "是否优先使用 emacs thread 功能来生成 dcache.
 
@@ -228,6 +233,8 @@ code 对应的中文词条了."
   (interactive "F将个人缓存中的词条导出到文件：")
   (pyim-dcache-call-api 'export-personal-words file confirm)
   (message "Pyim export finished."))
+
+(declare-function pyim-create-word "pyim")
 
 (defalias 'pyim-import 'pyim-dcache-import)
 (defun pyim-dcache-import (file &optional merge-method)
