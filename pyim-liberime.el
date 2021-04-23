@@ -132,7 +132,7 @@
 
 (defvar pyim-liberime-code-log nil)
 (defvar pyim-liberime-word-log nil)
-(defun pyim-page-select-word:rime ()
+(defun pyim-select-word:rime ()
   "从选词框中选择当前词条，然后删除该词条对应拼音。"
   (interactive)
   (pyim-outcome-handle 'candidate)
@@ -165,7 +165,7 @@
       (setq pyim-liberime-word-log nil)
       (pyim-terminate-translation)
       ;; pyim 使用这个 hook 来处理联想词。
-      (run-hooks 'pyim-page-select-finish-hook))))
+      (run-hooks 'pyim-select-finish-hook))))
 
 (defun pyim-autoselector-rime (&rest _args)
   "适用于RIME的自动上屏器."
@@ -225,7 +225,7 @@
 ONlY works with quanpin."
   ;; 判断当前 rime 环境是否支持全拼，如果支持，就添加词条。
   (ignore-errors
-    (let ((codes (pyim-hanzi2pinyin word nil "-" t nil t)))
+    (let ((codes (pyim-cstring-to-pinyin word nil "-" t nil t)))
       (when (member "你好" (liberime-search "nihao" 10))
         (dolist (code codes)
           (unless (pyim-string-match-p "[^ a-z-]" code)
