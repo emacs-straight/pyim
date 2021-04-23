@@ -112,16 +112,12 @@
     (when (char-after point-after)
       (char-to-string (char-after point-after)))))
 
-(defun pyim-posframe-valid-p ()
-  "Test posframe's status."
-  (and (>= emacs-major-version 26)
-       (featurep 'posframe)
-       (not (or noninteractive
-                emacs-basic-display
-                (not (display-graphic-p))))))
-
 (defun pyim-exwm-enable-p ()
-  "测试当前是否是 exwm 环境。"
+  "测试当前是否是 exwm 环境。
+
+FIXME: This seem to be not a good approach, the
+better way is let exwm provide a test function.
+for example: https://github.com/ch11ng/exwm/pull/831"
   (string-match-p " \\*temp\\*" (buffer-name)))
 
 

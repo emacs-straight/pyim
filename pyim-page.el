@@ -458,19 +458,24 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
           (gethash :current-page page-info)
           (gethash :total-page page-info)))
 
+(defun pyim-page-posframe-workable-p ()
+  "Test posframe's workable status."
+  (and (functionp 'posframe-workable-p)
+       (posframe-workable-p)))
+
 (defun pyim-page-tooltip-show (string position)
   "在 POSITION 位置，使用 posframe 或者 popup 显示字符串 STRING."
   (let ((tooltip pyim-page-tooltip))
     (cond ((and (eq tooltip 'posframe)
-                (pyim-posframe-valid-p))
+                (pyim-page-posframe-workable-p))
            (posframe-show pyim-page-tooltip-posframe-buffer
                           :string string
                           :position position
                           :min-width pyim-page-posframe-min-width
                           :background-color (face-attribute 'pyim-page :background)
                           :foreground-color (face-attribute 'pyim-page :foreground)
-                          :internal-border-width pyim-page-posframe-border-width
-                          :internal-border-color (face-attribute 'pyim-page-border :background)))
+                          :border-width pyim-page-posframe-border-width
+                          :border-color (face-attribute 'pyim-page-border :background)))
           ((and (eq tooltip 'popup)
                 (functionp 'popup-tip))
            (popup-tip string :point position :margin 1))
