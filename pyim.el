@@ -202,17 +202,16 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
 
   (pyim-dcache-init-variables)
 
-  (when pyim-dcache-auto-update
-    (pyim-dcache-call-api 'update-personal-words restart))
+  (pyim-dcache-update-personal-words restart)
 
   (pyim-pymap-cchar2py-cache-create)
   (pyim-pymap-py2cchar-cache-create)
   (run-hooks 'pyim-load-hook)
 
-  (when pyim-dcache-auto-update
-    (pyim-dcache-update-code2word refresh-common-dcache)
-    ;; 这个命令 *当前* 主要用于五笔输入法。
-    (pyim-dcache-call-api 'update-shortcode2word restart))
+  (pyim-dcache-update-code2word refresh-common-dcache)
+
+  ;; 这个命令 *当前* 主要用于五笔输入法。
+  (pyim-dcache-update-shortcode2word restart))
 
   ;; Make sure personal or other dcache are saved to file before kill emacs.
   (add-hook 'kill-emacs-hook #'pyim-dcache-save-caches)
@@ -260,9 +259,6 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
   (pyim-start "pyim" nil t
               save-personal-dcache refresh-common-dcache))
 
-(defun pyim-insert-word-into-icode2word (word pinyin prepend)
-  (pyim-dcache-call-api 'insert-word-into-icode2word word pinyin prepend))
-
 (defun pyim-create-word (word &optional prepend wordcount-handler)
   (pyim-create-pyim-word word prepend wordcount-handler))
 
@@ -295,17 +291,12 @@ BUG：拼音无法有效地处理多音字。"
                         (t (pyim-cstring-to-pinyin word nil "-" t nil t)))))
       ;; 保存对应词条的词频
       (when (> (length word) 0)
-        (pyim-dcache-call-api
-         'update-iword2count
-         word
-         prepend
-         wordcount-handler))
+        (pyim-dcache-update-iword2count word prepend wordcount-handler))
       ;; 添加词条到个人缓存
       (dolist (code codes)
         (unless (pyim-string-match-p "[^ a-z-]" code)
-          (pyim-insert-word-into-icode2word word
-                                            (concat (or code-prefix "") code)
-                                            prepend)))
+          (pyim-dcache-insert-icode2word
+           word (concat (or code-prefix "") code) prepend)))
       ;; TODO, 排序个人词库?
       )))
 
@@ -354,7 +345,7 @@ BUG：拼音无法有效地处理多音字。"
            code)
       (if (not (string-match-p "^\\cc+\\'" string))
           (error "不是纯中文字符串")
-        (setq code (pyim-dcache-call-api 'search-word-code string))
+        (setq code (pyim-dcache-search-word-code string))
         (if code
             (message "%S -> %S " string code)
           (message "没有找到 %S 对应的编码。" string))))))
@@ -377,7 +368,7 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     (while (not (eobp))
       (let ((word (car (pyim-dline-parse))))
         (when (and word (not (pyim-string-match-p "\\CC" word)))
-          (pyim-delete-word-1 word)))
+          (pyim-dcache-delete-word word)))
       (forward-line 1)))
   (message "pyim: 批量删词完成！"))
 
@@ -385,7 +376,7 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
   "从个人词库中删除最新创建的词条。"
   (interactive)
   (when pyim-last-created-word
-    (pyim-delete-word-1 pyim-last-created-word)
+    (pyim-dcache-delete-word pyim-last-created-word)
     (message "pyim: 从个人词库中删除词条 “%s” !" pyim-last-created-word)))
 
 (defun pyim-delete-word-at-point (&optional number silent)
@@ -393,7 +384,7 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 当 SILENT 设置为 t 是，不显示提醒信息。"
   (let* ((string (pyim-cstring-at-point (or number 2))))
     (when string
-      (pyim-delete-word-1 string)
+      (pyim-dcache-delete-word string)
       (unless silent
         (message "词条: \"%s\" 已经从个人词库缓冲中删除。" string)))))
 
@@ -405,13 +396,9 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
                      (region-beginning) (region-end))))
         (when (and (< (length string) 6)
                    (> (length string) 0))
-          (pyim-delete-word-1 string)
+          (pyim-dcache-delete-word string)
           (message "将词条: %S 从 personal 缓冲中删除。" string)))
     (message "请首先高亮选择需要删除的词条。")))
-
-(defun pyim-delete-word-1 (word)
-  "将中文词条 WORD 从个人词库中删除"
-  (pyim-dcache-call-api 'delete-word word))
 
 ;; ** 处理用户输入字符的相关函数
 (defun pyim-input-method (key)
@@ -606,15 +593,13 @@ Return the input string.
   (pyim-preview-delete-string)
   (setq pyim-candidates nil)
   (setq pyim-candidates-last nil)
-  (when pyim-candidates-create-timer
-    (cancel-timer pyim-candidates-create-timer)
-    (setq pyim-candidates-create-timer nil))
   (setq pyim-assistant-scheme-enable nil)
   (setq pyim-force-input-chinese nil)
   (when (and (eq pyim-page-tooltip 'posframe)
              (pyim-posframe-workable-p))
     (posframe-hide pyim-page-tooltip-posframe-buffer))
   (pyim-entered-erase-buffer)
+  (pyim-entered-refresh-timer-reset)
   (let* ((class (pyim-scheme-get-option (pyim-scheme-name) :class))
          (func (intern (format "pyim-terminate-translation:%S" class))))
     (when (and class (functionp func))
@@ -866,7 +851,7 @@ Return the input string.
 (defun pyim-inactivate ()
   "取消 pyim 的激活状态."
   (interactive)
-  (mapc #'kill-local-variable pyim-local-variable-list)
+  (pyim-kill-local-variables)
   (run-hooks 'pyim-inactive-hook))
 
 (defun pyim-toggle-input-ascii ()

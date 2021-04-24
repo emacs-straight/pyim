@@ -179,12 +179,30 @@ VARIABLE 变量，FORCE-RESTORE 设置为 t 时，强制恢复，变量原来的
 词库缓冲文件，然后加载词库缓存。
 
 如果 FORCE 为真，强制加载。"
-  (let* ((dict-files (mapcar (lambda (x)
-                               (unless (plist-get x :disable)
-                                 (plist-get x :file)))
-                             `(,@pyim-dicts ,@pyim-extra-dicts)))
-         (dicts-md5 (pyim-dcache-create-dicts-md5 dict-files)))
-    (pyim-dcache-call-api 'update-code2word dict-files dicts-md5 force)))
+  (when pyim-dcache-auto-update
+    (let* ((dict-files (mapcar (lambda (x)
+                                 (unless (plist-get x :disable)
+                                   (plist-get x :file)))
+                               `(,@pyim-dicts ,@pyim-extra-dicts)))
+           (dicts-md5 (pyim-dcache-create-dicts-md5 dict-files)))
+      (pyim-dcache-call-api 'update-code2word dict-files dicts-md5 force))))
+
+(defun pyim-dcache-update-personal-words (&optional force)
+  "更新个人缓存词库。
+如果 FORCE non-nil, 则强制更新。"
+  (when pyim-dcache-auto-update
+    (pyim-dcache-call-api 'update-personal-words force)))
+
+(defun pyim-dcache-update-shortcode2word (&optional force)
+  "更新 shortcode2word 缓存。
+
+如果 FORCE non-nil, 则强制更新。"
+  (when pyim-dcache-auto-update
+    (pyim-dcache-call-api 'update-shortcode2word force)))
+
+(defun pyim-dcache-update-iword2count (word &optional prepend wordcount-handler)
+  "保存词频到缓存."
+  (pyim-dcache-call-api 'update-iword2count word prepend wordcount-handler))
 
 (defun pyim-dcache-init-variables ()
   "初始化 dcache 缓存相关变量."
@@ -272,6 +290,18 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表
   (pyim-dcache-call-api 'update-personal-words t)
 
   (message "pyim: 词条相关信息导入完成！"))
+
+(defun pyim-dcache-search-word-code (word)
+  "搜素中文词条 WORD 对应的 code."
+  (pyim-dcache-call-api 'search-word-code word))
+
+(defun pyim-dcache-delete-word (word)
+  "将中文词条 WORD 从个人词库中删除"
+  (pyim-dcache-call-api 'delete-word word))
+
+(defun pyim-dcache-insert-icode2word (word pinyin prepend)
+  "保存个人词到缓存."
+  (pyim-dcache-call-api 'insert-word-into-icode2word word pinyin prepend))
 
 ;; * Footer
 (provide 'pyim-dcache)

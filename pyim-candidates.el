@@ -30,10 +30,7 @@
 (require 'cl-lib)
 (require 'pyim-common)
 (require 'pyim-dcache)
-(require 'pyim-imobjs)
 (require 'pyim-codes)
-(require 'pyim-page)
-(require 'pyim-preview)
 
 (defgroup pyim-candidates nil
   "Candidates of pyim."
@@ -45,9 +42,6 @@
 (defvar pyim-candidates-last nil
   "上一轮备选词条列表，这个变量主要用于 autoselector 机制.")
 
-(defvar pyim-candidates-create-timer nil
-  "异步创建 candidates 时，使用的 timer.")
-
 (defvar pyim-candidate-position nil
   "当前选择的词条在 ‘pyim-candidates’ 中的位置.
 
@@ -55,18 +49,6 @@
 
 (pyim-register-local-variables
  '(pyim-candidates pyim-candidate-position))
-
-(defun pyim-candidates-create-timer-function ()
-  "Function used by `pyim-candidates-create-timer'"
-  (let* ((scheme-name (pyim-scheme-name))
-         (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
-    (when words
-      (setq pyim-candidates words)
-      (pyim-preview-refresh)
-      ;; NEED HELP: 目前只有 posframe 可以正确处理异步刷新 page
-      (when (and (member pyim-page-tooltip '(posframe minibuffer))
-                 (not (eq (selected-window) (minibuffer-window))))
-        (pyim-page-refresh)))))
 
 ;; ** 获取备选词列表
 (defun pyim-candidates-create (imobjs scheme-name &optional async)
