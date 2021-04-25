@@ -173,20 +173,21 @@
 (register-input-method "pyim" "euc-cn" 'pyim-start (nth 0 pyim-titles))
 
 ;;;###autoload
-(defun pyim-start (_name &optional _active-func restart save-personal-dcache refresh-common-dcache)
+(defun pyim-start (_name &optional _active-func restart save-personal-dcache _refresh-common-dcache)
   "pyim 启动函数.
-  TODO: Document NAME ACTIVE-FUNC RESTART SAVE-PERSONAL-DCACHE REFRESH-COMMON-DCACHE
+  TODO: Document NAME ACTIVE-FUNC RESTART SAVE-PERSONAL-DCACHE
 
 pyim 是使用 `pyim-start' 来启动输入法，这个命令主要做如下工作：
-1. 重置 `pyim-local-variable-list' 中所有的 local 变量。
-2. 使用 `pyim-pymap-cchar2py-create-cache' 创建汉字到拼音的 hash table 对应表。
-3. 运行hook： `pyim-load-hook'。
-4. 将 `pyim-dcache-save-caches' 命令添加到 `kill-emacs-hook' , emacs 关闭
+1. 重置所有的 local 变量。
+2. 创建汉字到拼音和拼音到汉字的 hash table。
+3. 创建词库缓存 dcache.
+4. 运行 hook： `pyim-load-hook'。
+5. 将 `pyim-dcache-save-caches' 命令添加到 `kill-emacs-hook' , emacs 关闭
 之前将用户选择过的词生成的缓存和词频缓存保存到文件，供以后使用。
-5. 设定变量：
-1. `input-method-function'
-2. `deactivate-current-input-method-function'
-6. 运行 `pyim-active-hook'
+6. 设定变量：
+   1. `input-method-function'
+   2. `deactivate-current-input-method-function'
+7. 运行 `pyim-active-hook'
 
 pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
 `input-method-function' 设置为 `pyim-input-method' ，这个变量会影
@@ -197,22 +198,14 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
 数`pyim-start-translation'."
   (interactive)
   (pyim-recreate-local-variables)
+
   (when (and restart save-personal-dcache)
     (pyim-dcache-save-caches))
 
-  (pyim-dcache-init-variables)
+  (pyim-pymap-cache-create)
+  (pyim-dcache-update restart)
 
-  (pyim-dcache-update-personal-words restart)
-
-  (pyim-pymap-cchar2py-cache-create)
-  (pyim-pymap-py2cchar-cache-create)
   (run-hooks 'pyim-load-hook)
-
-  (pyim-dcache-update-code2word refresh-common-dcache)
-
-  ;; 这个命令 *当前* 主要用于五笔输入法。
-  (pyim-dcache-update-shortcode2word restart))
-
   ;; Make sure personal or other dcache are saved to file before kill emacs.
   (add-hook 'kill-emacs-hook #'pyim-dcache-save-caches)
   (setq input-method-function #'pyim-input-method)
@@ -223,9 +216,6 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
   (when (eq (selected-window) (minibuffer-window))
     (add-hook 'minibuffer-exit-hook #'pyim-exit-from-minibuffer))
   (run-hooks 'pyim-active-hook)
-  (when (and (eq pyim-page-tooltip 'posframe)
-             (not (pyim-posframe-workable-p)))
-    (message "PYIM: posframe 没有正确安装或者当前 Emacs 版本不支持 posframe。"))
   (when restart
     (message "pyim 重启完成。"))
   nil)
@@ -246,18 +236,16 @@ pyim 使用函数 `pyim-start' 启动输入法的时候，会将变量
 启之前，询问用户，是否保存个人词频信息。"
   (interactive
    (let ((save-personal-dcache
-          (yes-or-no-p "重启 pyim 前，需要保存个人词频信息吗？ "))
-         (refresh-common-dcache
-          (yes-or-no-p "需要强制刷新词库缓存吗？ ")))
-     (pyim-restart-1 save-personal-dcache refresh-common-dcache))))
+          (yes-or-no-p "重启 pyim 前，需要保存个人词频信息吗？ ")))
+     (pyim-restart-1 save-personal-dcache))))
 
-(defun pyim-restart-1 (&optional save-personal-dcache refresh-common-dcache)
+(defun pyim-restart-1 (&optional save-personal-dcache _refresh-common-dcache)
   "重启 pyim，用于编程环境.
 
 当 SAVE-PERSONAL-DCACHE 是 non-nil 时，保存个人词库文件。
-当 REFRESH-COMMON-DCACHE 是 non-nil 时，强制刷新词库缓存。"
-  (pyim-start "pyim" nil t
-              save-personal-dcache refresh-common-dcache))
+
+REFRESH-COMMON-DCACHE 已经废弃，不要再使用了。"
+  (pyim-start "pyim" nil t save-personal-dcache))
 
 (defun pyim-create-word (word &optional prepend wordcount-handler)
   (pyim-create-pyim-word word prepend wordcount-handler))
@@ -595,9 +583,7 @@ Return the input string.
   (setq pyim-candidates-last nil)
   (setq pyim-assistant-scheme-enable nil)
   (setq pyim-force-input-chinese nil)
-  (when (and (eq pyim-page-tooltip 'posframe)
-             (pyim-posframe-workable-p))
-    (posframe-hide pyim-page-tooltip-posframe-buffer))
+  (pyim-page-hide)
   (pyim-entered-erase-buffer)
   (pyim-entered-refresh-timer-reset)
   (let* ((class (pyim-scheme-get-option (pyim-scheme-name) :class))
