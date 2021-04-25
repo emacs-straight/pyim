@@ -32,6 +32,9 @@
 (require 'popup nil t)
 (require 'pyim-common)
 
+(eval-when-compile
+  (require 'pyim-entered))
+
 (defgroup pyim-page nil
   "Page tools for pyim."
   :group 'pyim)
@@ -278,6 +281,8 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
          (class (pyim-scheme-get-option scheme-name :class)))
     (when class
       (funcall (intern (format "pyim-page-preview-create:%S" class)) separator))))
+
+(declare-function 'pyim-with-entered-buffer "pyim-entered")
 
 (defun pyim-page-preview-create:quanpin (&optional separator)
   (let* ((separator (or separator " "))

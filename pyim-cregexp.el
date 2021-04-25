@@ -197,7 +197,8 @@
       (unless (equal regexp "")
         (concat (if match-beginning "^" "") regexp)))))
 
-(defun pyim-convert-cregexp-at-point (&optional insert-only)
+(define-obsolete-function-alias 'pyim-convert-cregexp-at-point 'pyim-cregexp-convert-at-point "4.0")
+(defun pyim-cregexp-convert-at-point (&optional insert-only)
   "将光标前的字符串按拼音的规则转换为一个搜索中文的 regexp.
 用于实现拼音搜索中文的功能。
 
@@ -230,7 +231,7 @@
                (window-minibuffer-p))
       (exit-minibuffer))))
 
-(defun pyim-isearch-search-fun ()
+(defun pyim-cregexp-isearch-search-fun ()
   "这个函数为 isearch 相关命令添加中文拼音搜索功能，
 做为 `isearch-search-fun' 函数的 advice 使用。"
   (funcall
@@ -249,12 +250,14 @@
   :lighter " pyim-isearch"
   (if pyim-isearch-mode
       (progn
-        (advice-add 'isearch-search-fun :override #'pyim-isearch-search-fun)
+        (advice-add 'isearch-search-fun :override #'pyim-cregexp-isearch-search-fun)
         (message "PYIM: `pyim-isearch-mode' 已经激活，激活后，一些 isearch 扩展包有可能失效。"))
-    (advice-remove 'isearch-search-fun #'pyim-isearch-search-fun)))
+    (advice-remove 'isearch-search-fun #'pyim-cregexp-isearch-search-fun)))
 
 (declare-function ivy--regex-plus "ivy")
-(defun pyim-ivy-cregexp (str)
+
+(define-obsolete-function-alias 'pyim-ivy-cregexp 'pyim-cregexp-ivy "4.0")
+(defun pyim-cregexp-ivy (str)
   "Let ivy support search Chinese with pinyin feature."
   (let ((x (ivy--regex-plus str))
         (case-fold-search nil))
