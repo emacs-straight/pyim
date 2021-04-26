@@ -90,7 +90,7 @@ pyim 使用函数 `pyim-outcome-handle-char' 来处理特殊功能触发字符�
   "可以使用 `pyim-outcome-trigger' 激活的函数。
 
 这个函数与『单字快捷键配合使用』，当光标前面的字符为汉字字符时，
-按 `pyim-outcome-trigger' 对应字符，可以调用这个函数来清洗
+按 `pyim-outcome-trigger' 对应字符，可以调用这个函数来处理
 光标前面的文字内容。"
   :type 'function)
 
@@ -312,22 +312,27 @@ alist 列表。"
          new-string)
     (when (> (length string) 0)
       (delete-region begin end)
-      (setq new-string
-            (with-temp-buffer
-              (insert string)
-              (goto-char (point-min))
-              (while (re-search-forward "\\([，。；？！；、）】]\\) +\\([[:ascii:]]\\)" nil t)
-                (replace-match (concat (match-string 1) (match-string 2))  nil t))
-              (goto-char (point-min))
-              (while (re-search-forward "\\([[:ascii:]]\\) +\\([（【]\\)" nil t)
-                (replace-match (concat (match-string 1) (match-string 2))  nil t))
-              (goto-char (point-min))
-              (while (re-search-forward "\\([[:ascii:]]\\) +\\(\\cc\\)" nil t)
-                (replace-match (concat (match-string 1) sep (match-string 2))  nil t))
-              (goto-char (point-min))
-              (while (re-search-forward "\\(\\cc\\) +\\([[:ascii:]]\\)" nil t)
-                (replace-match (concat (match-string 1) sep (match-string 2))  nil t))
-              (buffer-string)))
+      (with-temp-buffer
+        (insert string)
+        (dolist (x `(;; 中文标点与英文之间的空格
+                     ("\\([，。；？！；、）】]\\) *\\([[:ascii:]]\\)" . "")
+                     ;; 英文与中文标点之间的空格
+                     ("\\([[:ascii:]]\\) *\\([（【]\\)" . "")
+                     ;; 英文与汉字之间的空格
+                     ("\\([[:ascii:]]\\) *\\(\\cc\\)" . ,sep)
+                     ;; 汉字与英文之间的空格
+                     ("\\(\\cc\\) *\\([[:ascii:]]\\)" . ,sep)
+                     ;; 汉字与汉字之间的空格
+                     ("\\(\\cc\\) +\\(\\cc\\)" . "")))
+          (dotimes (_ 3) ;NOTE. 数字3是一个经验数字。
+            (goto-char (point-min))
+            (while (re-search-forward (car x) nil t)
+              (replace-match
+               (concat (match-string 1)
+                       (cdr x)
+                       (match-string 2))
+               nil t))))
+        (setq new-string (buffer-string)))
       (insert new-string))))
 
 ;; * Footer
