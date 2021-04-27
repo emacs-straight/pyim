@@ -232,7 +232,7 @@ Return the input string.
              ;; 插入 preview string, pyim *强制* 将其设置为 nil
              (input-method-use-echo-area nil)
              (modified-p (buffer-modified-p))
-             last-command-event last-command this-command)
+             last-command-event last-command this-command inhibit-record)
 
         (setq pyim-translating t)
         (pyim-entered-erase-buffer)
@@ -240,12 +240,18 @@ Return the input string.
 
         (when key
           (setq unread-command-events
-                (cons key unread-command-events)))
+                (cons key unread-command-events)
+                inhibit-record t))
 
         (while pyim-translating
           (set-buffer-modified-p modified-p)
-          (let* ((keyseq (read-key-sequence nil nil nil t))
+          (let* (;; We inhibit record_char only for the first key,
+                 ;; because it was already recorded before read_char
+                 ;; called quail-input-method.
+                 (inhibit--record-char inhibit-record)
+                 (keyseq (read-key-sequence nil nil nil t))
                  (cmd (lookup-key pyim-mode-map keyseq)))
+            (setq inhibit-record nil)
             ;; (message "key: %s, cmd:%s\nlcmd: %s, lcmdv: %s, tcmd: %s"
             ;;          key cmd last-command last-command-event this-command)
             (if (if key
@@ -749,9 +755,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 
 ;; ** 金手指功能
 ;;;###autoload
-(define-obsolete-function-alias
-  'pyim-convert-code-at-point #'pyim-convert-string-at-point "2.0")
-
 (defun pyim-convert-string-at-point (&optional return-cregexp)
   "将光标前的用户输入的字符串转换为中文.
 
@@ -800,29 +803,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
             ((pyim-string-match-p "[[:punct:]：－]" (pyim-char-before-to-string 0))
              ;; 当光标前的一个字符是标点符号时，半角/全角切换。
              (call-interactively 'pyim-punctuation-translate-at-point))
-            ((and nil ;; 暂时还没有准备启用这个功能
-                  (eq pyim-default-scheme 'quanpin)
-                  (string-match "\\cc *$" string))
-             ;; 如果光标处是汉字，就用汉字的拼音来重新启动输入法
-             (setq string
-                   (if mark-active
-                       string
-                     (match-string 0 string)))
-             (setq length (length string))
-             (when mark-active
-               (delete-region
-                (region-beginning) (region-end)))
-             (when (and (not mark-active) (> length 0))
-               (delete-char (- 0 length)))
-             (setq code (pyim-cstring-to-pinyin
-                         (replace-regexp-in-string " " "" string)
-                         nil "-" nil t))
-             (when (and (> code 0)
-                        (> length 0))
-               (setq unread-command-events
-                     (append (listify-key-sequence code)
-                             unread-command-events))
-               (setq pyim-force-input-chinese t)))
             (t (message "Pyim: pyim-convert-string-at-point do noting."))))))
 
 ;; ** 编码反查功能
