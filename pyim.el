@@ -7,7 +7,7 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 3.6
+;; Version: 3.7
 ;; Keywords: convenience, Chinese, pinyin, input-method
 ;; Package-Requires: ((emacs "24.4") (async "1.6") (xr "1.13"))
 
@@ -160,6 +160,7 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
     (define-key map "\C-m" #'pyim-quit-no-clear)
     (define-key map [return] #'pyim-quit-no-clear)
     (define-key map "\C-c" #'pyim-quit-clear)
+    (define-key map "\C-g" #'pyim-quit-clear)
     map)
   "Pyim 的 Keymap.")
 
@@ -827,6 +828,16 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 
 ;; ** pyim 探针
 (require 'pyim-probe)
+
+;; ** Evil hack
+(defun pyim-hack-deactivate-input-method (orig_func)
+  (let ((deactivate-current-input-method-function
+         (or deactivate-current-input-method-function #'ignore)))
+    (funcall orig_func)))
+
+(with-eval-after-load
+    (advice-add 'deactivate-input-method :around #'pyim-hack-deactivate-input-method))
+
 
 ;; * Footer
 (provide 'pyim)
