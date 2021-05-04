@@ -35,6 +35,7 @@
 ;; * 代码                                                                 :code:
 (require 'pyim-common)
 (require 'pyim-dcache)
+(require 'pyim-scheme)
 (require 'async nil t)
 
 ;; Pyim 词库缓存文件，注意：变量名称中不能出现 ":" 等，不能作为文件名称的字符。
@@ -61,10 +62,14 @@
 (defun pyim-dcache-code-split (code)
   "将 CODE 分成 code-prefix 和 rest code."
   (cond
+   ;; 处理 nil
+   ((not code) nil)
    ;; 兼容性代码：旧版本的 pyim 使用一个标点符号作为 code-prefix
    ((pyim-string-match-p "^[[:punct:]]" code)
     (list (substring code 0 1) (substring code 1)))
-   ;; 拼音输入法不使用 code-prefix.
+   ;; 拼音输入法不使用 code-prefix, 并且包含 -
+   ((pyim-string-match-p "-" code)
+    (list "" code))
    ((not (pyim-string-match-p "[[:punct:]]" code))
     (list "" code))
    ;; 新 code-prefix 使用类似 "wubi/" 的格式。
@@ -318,6 +323,32 @@ code 对应的中文词条了。
      `(lambda (result)
         (setq pyim-dhashcache-update-icode2word-p t)
         (pyim-dcache-set-variable 'pyim-dhashcache-icode2word t)))))
+
+(defun pyim-dhashcache-upgrade-icode2word ()
+  "升级 icode2word 缓存。"
+  (let ((ruler-list (delete-dups
+                     (remove nil
+                             (mapcar
+                              (lambda (scheme)
+                                (let ((code-prefix (plist-get (cdr scheme) :code-prefix))
+                                      (code-prefix-history (plist-get (cdr scheme) :code-prefix-history)))
+                                  (when code-prefix-history
+                                    (cons code-prefix-history code-prefix))))
+                              pyim-schemes)))))
+    (dolist (ruler ruler-list)
+      (let ((old-prefix-list (car ruler))
+            (new-prefix (cdr ruler)))
+        (dolist (old-prefix old-prefix-list)
+          (maphash
+           (lambda (key value)
+             (when (string-prefix-p old-prefix key)
+               (let* ((key-words (gethash key pyim-dhashcache-icode2word))
+                      (new-key (concat new-prefix (string-remove-prefix old-prefix key)))
+                      (new-key-words (gethash new-key pyim-dhashcache-icode2word))
+                      (merged-value (delete-dups `(,@key-words ,@new-key-words))))
+                 (puthash new-key merged-value pyim-dhashcache-icode2word)
+                 (message "PYIM icode2word upgrade: %S %S -> %S %S\n" key key-words new-key new-key-words))))
+           pyim-dhashcache-icode2word))))))
 
 (defun pyim-dhashcache-update-personal-words (&optional force)
   (pyim-dhashcache-update-icode2word force)

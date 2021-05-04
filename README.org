@@ -20,10 +20,11 @@ code-prefix.
 1. 五笔用户
    1. 需要 (require 'pyim-wbdict), 加载五笔 scheme 设置。
    2. 需要将自己的五笔词库文件中的 code-prefix "." 替换为 "wubi/".
+   3. 运行 `pyim-dcache-upgrade-icode2word' 命令，升级个人词库。
 2. 仓颉用户
    1. 需要 (require 'pyim-cangjie5dict), 加载仓颉 scheme 设置。
    2. 需要将自己的五笔词库文件中的 code-prefix "@" 替换为 "cangjie/".
-
+   3. 仓颉输入法不使用个人词库，所以不需要运行 `pyim-dcache-upgrade-icode2word'.
 
 * 截图
 [[file:./snapshots/pyim-linux-x-with-toolkit.png]]
@@ -178,7 +179,7 @@ pyim 支持双拼输入模式，用户可以通过变量 `pyim-default-scheme' �
 
 ** 使用型码输入法
 1. 五笔输入法可以参考： https://github.com/tumashu/pyim-wbdict
-2. 仓颉输入法可以参考：https://github.com/p1uxtar/pyim-cangjie5dict
+2. 仓颉输入法可以参考：https://github.com/p1uxtar/pyim-cangjiedict
 3. 三码郑码（至至郑码）输入法可以参考： https://github.com/p1uxtar/pyim-smzmdict
 
 如果用户在使用型码输入法的过程中，忘记了某个字的编码，可以按 TAB 键临时切换到辅
