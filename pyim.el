@@ -7,7 +7,7 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 3.7.1
+;; Version: 3.7.2
 ;; Keywords: convenience, Chinese, pinyin, input-method
 ;; Package-Requires: ((emacs "24.4") (async "1.6") (xr "1.13"))
 
@@ -480,16 +480,20 @@ BUG：拼音无法有效地处理多音字。"
           (pyim-dcache-insert-icode2word
            word (concat (or code-prefix "") code) prepend)))
       ;; TODO, 排序个人词库?
-      )))
+      ;; 返回 codes 和 word, 用于 message 命令。
+      (mapconcat (lambda (code)
+                   (format "%s -> %s" (concat (or code-prefix "") code) word))
+                 codes "; "))))
 
 (defun pyim-create-word-at-point (&optional number silent)
-  "将光标前字符数为 NUMBER 的中文字符串添加到个人词库中
-当 SILENT 设置为 t 是，不显示提醒信息。"
-  (let ((string (pyim-cstring-at-point (or number 2))))
+  "将光标前字符数为 NUMBER 的中文字符串添加到个人词库中，当
+SILENT 设置为 t 是，不显示提醒信息。"
+  (let ((string (pyim-cstring-at-point (or number 2)))
+        output)
     (when string
-      (pyim-create-word string)
+      (setq output (pyim-create-word string))
       (unless silent
-        (message "将词条: \"%s\" 加入 personal 缓冲。" string)))))
+        (message "将词条: %S 加入 personal 缓冲。" output)))))
 
 (defun pyim-create-2cchar-word-at-point ()
   "将光标前2个中文字符组成的字符串加入个人词库。"
@@ -510,13 +514,14 @@ BUG：拼音无法有效地处理多音字。"
   "Add the selected text as a Chinese word into the personal dictionary."
   (interactive)
   (when (region-active-p)
-    (let ((string (buffer-substring-no-properties (region-beginning) (region-end))))
+    (let ((string (buffer-substring-no-properties (region-beginning) (region-end)))
+          output)
       (if (> (length string) 6)
           (error "词条太长")
         (if (not (string-match-p "^\\cc+\\'" string))
             (error "不是纯中文字符串")
-          (pyim-create-word string)
-          (message "将词条: %S 插入 personal file。" string))))))
+          (setq output (pyim-create-word string))
+          (message "将词条: %S 插入 personal file。" output))))))
 
 ;; ** 删词功能
 (defun pyim-delete-words-in-file (file)
@@ -681,9 +686,11 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
           ;; 字符串里面剪掉。
           (delete-region (point-min) (point)))
         (pyim-entered-refresh))
-    (when (string-empty-p (pyim-code-search (pyim-outcome-get)
-                                            (pyim-scheme-name)))
-      (pyim-create-pyim-word (pyim-outcome-get) t))
+    ;; 型码输入法，只考虑将词条保存到个人词库，用于调整词频，单字不保存。
+    (when (> (length (pyim-outcome-get)) 1)
+      (if (member (pyim-outcome-get) pyim-candidates)
+          (pyim-create-pyim-word (pyim-outcome-get) t)
+        (pyim-create-pyim-word (pyim-outcome-get))))
     (pyim-terminate-translation)
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
