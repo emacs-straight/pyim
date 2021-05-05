@@ -20,11 +20,10 @@ code-prefix.
 1. 五笔用户
    1. 需要 (require 'pyim-wbdict), 加载五笔 scheme 设置。
    2. 需要将自己的五笔词库文件中的 code-prefix "." 替换为 "wubi/".
-   3. 运行 `pyim-dcache-upgrade-icode2word' 命令，升级个人词库。
+   3. 运行 `pyim-dcache-upgrade-icode2word' 命令，升级 icode2word 词库缓存。
 2. 仓颉用户
    1. 需要 (require 'pyim-cangjie5dict), 加载仓颉 scheme 设置。
    2. 需要将自己的五笔词库文件中的 code-prefix "@" 替换为 "cangjie/".
-   3. 仓颉输入法不使用个人词库，所以不需要运行 `pyim-dcache-upgrade-icode2word'.
 
 * 截图
 [[file:./snapshots/pyim-linux-x-with-toolkit.png]]
@@ -386,6 +385,10 @@ E-Neo 同学编写了一个词库转换工具: [[https://github.com/E-Neo/scel2p
 1. 软件名称： scel2pyim
 2. 下载地址： https://github.com/E-Neo/scel2pyim
 3. 编写语言： C语言
+
+*** 第三种方式
+
+可以了解：https://github.com/redguardtoo/pyim-tsinghua-dict
 
 ** 如何手动安装和管理词库
 这里假设有两个词库文件：
