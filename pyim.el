@@ -450,8 +450,7 @@ REFRESH-COMMON-DCACHE 已经废弃，不要再使用了。"
 词条 WORD 默认会追加到已有词条的后面，如果 PREPEND 设置为 t,
 词条就会放到已有词条的最前面。
 
-根据当前输入法，决定是调用 `pyim-cstring-to-pinyin' 还是
-`pyim-cstring-to-xingma' 来获取中文词条的编码。
+这是函数会调用 `pyim-cstring-to-codes' 来获取中文词条对应的编码。
 
 WORDCOUNT-HANDLER 可以是一个数字，代表将此数字设置为 WORD 的新词频，
 WORDCOUNT-HANDLER 也可以是一个函数，其返回值将设置为 WORD 的新词频，
@@ -467,10 +466,7 @@ BUG：拼音无法有效地处理多音字。"
     (let* ((scheme-name (pyim-scheme-name))
            (class (pyim-scheme-get-option scheme-name :class))
            (code-prefix (pyim-scheme-get-option scheme-name :code-prefix))
-           (codes (cond ((eq class 'xingma)
-                         (pyim-cstring-to-xingma word scheme-name t))
-                        ;;拼音使用了多音字校正
-                        (t (pyim-cstring-to-pinyin word nil "-" t nil t)))))
+           (codes (pyim-cstring-to-codes word scheme-name)))
       ;; 保存对应词条的词频
       (when (> (length word) 0)
         (pyim-dcache-update-iword2count word prepend wordcount-handler))
@@ -842,17 +838,18 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 
 ;; ** 编码反查功能
 (defun pyim-search-word-code ()
-  "选择词条，然后反查它的 code. 这个功能对五笔用户有用。"
+  "选择词条，然后反查它的 code。"
   (interactive)
   (when (region-active-p)
     (let* ((string (buffer-substring-no-properties (region-beginning) (region-end)))
            code)
       (if (not (string-match-p "^\\cc+\\'" string))
-          (error "不是纯中文字符串")
-        (setq code (pyim-dcache-search-word-code string))
-        (if code
-            (message "%S -> %S " string code)
-          (message "没有找到 %S 对应的编码。" string))))))
+          (error "PYIM: 不是纯中文字符串。")
+        (setq codes (pyim-cstring-to-codes string pyim-default-scheme))
+        (if codes
+            (message "PYIM (%S): %S -> %S" pyim-default-scheme string codes)
+          (message "PYIM: 没有找到 %S 对应的编码。" string)))
+      (deactivate-mark))))
 
 ;; ** pyim 中文字符串工具
 (require 'pyim-cstring)
