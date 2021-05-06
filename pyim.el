@@ -686,11 +686,9 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
           ;; 字符串里面剪掉。
           (delete-region (point-min) (point)))
         (pyim-entered-refresh))
-    ;; 型码输入法，只考虑将词条保存到个人词库，用于调整词频，单字不保存。
-    (when (> (length (pyim-outcome-get)) 1)
-      (if (member (pyim-outcome-get) pyim-candidates)
-          (pyim-create-pyim-word (pyim-outcome-get) t)
-        (pyim-create-pyim-word (pyim-outcome-get))))
+    (if (member (pyim-outcome-get) pyim-candidates)
+        (pyim-create-pyim-word (pyim-outcome-get) t)
+      (pyim-create-pyim-word (pyim-outcome-get)))
     (pyim-terminate-translation)
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
@@ -789,7 +787,8 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
       (cond
        ;; 如果用户已经选择词条，就将此词条添加到个人词库。
        ((region-active-p)
-        (pyim-create-word-from-selection))
+        (pyim-create-word-from-selection)
+        (deactivate-mark))
        ;; 删除用户自定义词条。比如：在一个中文字符串后输入 2-，运行此命令可以将
        ;; 光标前两个中文字符组成的字符串，从个人词库删除。
        ((and (eq (char-before) ?-)
