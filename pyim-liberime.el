@@ -156,7 +156,7 @@
             (delete-region (point-min) (point))
             (insert to-be-translated)
             (goto-char (point-max)))
-          (pyim-entered-refresh))
+          (pyim-refresh))
       ;; 在 rime 后端造词和调整瓷瓶词频
       (pyim-liberime-create-word
        (reverse pyim-liberime-code-log)
@@ -168,7 +168,7 @@
           (pyim-create-pyim-word (pyim-outcome-get))))
       (setq pyim-liberime-code-log nil)
       (setq pyim-liberime-word-log nil)
-      (pyim-terminate-translation)
+      (pyim-refresh-terminate)
       ;; pyim 使用这个 hook 来处理联想词。
       (run-hooks 'pyim-select-finish-hook))))
 
@@ -237,7 +237,7 @@ ONlY works with quanpin."
             (pyim-liberime-create-word
              (split-string code "-")
              (remove "" (split-string word "")))
-            (pyim-terminate-translation:rime)))))))
+            (pyim-refresh-terminate:rime)))))))
 
 (advice-add 'pyim-create-word :after #'pyim-create-rime-word)
 
@@ -290,7 +290,7 @@ Please see: https://github.com/rime/librime/issues/349"
    ;; 找不到通用的处理方式的话就不做截取处理。
    (t input)))
 
-(defun pyim-terminate-translation:rime ()
+(defun pyim-refresh-terminate:rime ()
   (liberime-clear-commit)
   (liberime-clear-composition))
 
