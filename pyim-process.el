@@ -29,20 +29,39 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 (require 'pyim-common)
-(require 'pyim-pymap)
-(require 'pyim-pinyin)
-(require 'pyim-punctuation)
-(require 'pyim-dict)
-(require 'pyim-dcache)
 (require 'pyim-scheme)
+(require 'pyim-dcache)
+(require 'pyim-entered)
 (require 'pyim-imobjs)
 (require 'pyim-codes)
 (require 'pyim-page)
-(require 'pyim-entered)
 (require 'pyim-candidates)
 (require 'pyim-preview)
 (require 'pyim-outcome)
+(require 'pyim-punctuation)
 (require 'pyim-autoselector)
+(require 'pyim-cstring)
+
+(defcustom pyim-english-input-switch-functions nil
+  "让 pyim 开启英文输入功能.
+
+这个变量的取值为一个函数列表，这个函数列表中的任意一个函数的
+运行结果为 t 时，pyim 开启英文输入功能。"
+  :type 'symbol)
+
+(defcustom pyim-magic-converter nil
+  "将 “待选词条” 在 “上屏” 之前自动转换为其他字符串.
+这个功能可以实现“简转繁”，“输入中文得到英文”之类的功能。"
+  :type 'boolean)
+
+(defvar pyim-process-input-ascii nil
+  "是否开启 pyim 英文输入模式.")
+
+(defvar pyim-process-force-input-chinese nil
+  "是否强制开启中文输入模式.
+
+这个变量只用于 `pyim-convert-string-at-point', 不要
+在其它地方使用。")
 
 (defvar pyim-process-translating nil
   "记录是否在转换状态.")
@@ -57,20 +76,25 @@
 (defvar pyim-process-run-timer nil
   "异步处理 intered 时时，使用的 timer.")
 
+(pyim-register-local-variables
+ '(pyim-process-input-ascii
+   pyim-process-translating
+   pyim-process-last-created-word))
+
 (defun pyim-process-init-dcaches (&optional force save-caches)
   "PYIM 流程，词库相关的初始化工作。"
   (pyim-recreate-local-variables)
   (pyim-pymap-cache-create)
   (pyim-dcache-update force))
 
-(defun pyim-process-init-ui ()
-  "PYIM 流程，用户界面相关的初始化工作。"
-  (pyim-preview-setup-overlay))
-
 (defun pyim-process-save-dcaches (&optional force)
   "PYIM 流程，保存 dcache."
   (when force
     (pyim-dcache-save-caches)))
+
+(defun pyim-process-init-ui ()
+  "PYIM 流程，用户界面相关的初始化工作。"
+  (pyim-preview-setup-overlay))
 
 (defmacro pyim-process-with-entered-buffer (&rest forms)
   "PYIM 流程的输入保存在一个 buffer 中，使用 FORMS 处理这个 buffer
@@ -115,8 +139,6 @@
               (cl-decf pos)))))
       end-position)))
 
-(defvar pyim-english-input-switch-functions)
-
 (defun pyim-process-auto-switch-english-input-p ()
   "判断是否 *根据环境自动切换* 为英文输入模式，这个函数处理变量：
 `pyim-english-input-switch-functions'"
@@ -129,7 +151,7 @@
                         ((listp func-or-list) func-or-list)
                         (t nil)))
          (setq current-input-method-title
-               (if pyim-input-ascii
+               (if pyim-process-input-ascii
                    (nth 1 pyim-titles)
                  (nth 2 pyim-titles))))))
 
@@ -138,8 +160,8 @@
   (let* ((scheme-name (pyim-scheme-name))
          (first-chars (pyim-scheme-get-option scheme-name :first-chars))
          (rest-chars (pyim-scheme-get-option scheme-name :rest-chars)))
-    (and (or pyim-force-input-chinese
-             (and (not pyim-input-ascii)
+    (and (or pyim-process-force-input-chinese
+             (and (not pyim-process-input-ascii)
                   (not (pyim-process-auto-switch-english-input-p))))
          (if (not (string< "" (pyim-entered-get 'point-before)))
              (member last-command-event
@@ -163,10 +185,6 @@
               (run-with-timer (/ pyim-entered-exhibit-delay-ms 1000.0)
                               nil
                               #'pyim-process-run-1))))))
-
-;; 没有这一行，native-compilation 会出现奇怪的问题，pyim-process-outcome-handle 会获取到
-;; 错误的 pyim-candidates 取值。原因未知。
-(defvar pyim-candidates)
 
 (defun pyim-process-run-1 ()
   "查询 `pyim-entered-buffer' 光标前的拼音字符串（如果光标在行首则为光标后的）, 显示备选词等待用户选择。"
@@ -431,7 +449,6 @@ alist 列表。"
      ;; 当输入的字符不是标点符号时，原样插入。
      (t str))))
 
-(defvar pyim-cstring-to-code-criteria)
 (defun pyim-process-create-code-criteria ()
   "创建 `pyim-cstring-to-code-criteria'."
   (setq pyim-cstring-to-code-criteria
@@ -491,7 +508,7 @@ BUG：拼音无法有效地处理多音字。"
   "Terminate the translation of the current key."
   (setq pyim-process-translating nil)
   (pyim-entered-erase-buffer)
-  (setq pyim-force-input-chinese nil)
+  (setq pyim-process-force-input-chinese nil)
   (setq pyim-candidates nil)
   (setq pyim-candidates-last nil)
   (pyim-preview-delete-string)

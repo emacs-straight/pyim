@@ -45,17 +45,6 @@
   "Pyim is a Chinese input method support quanpin, shuangpin, wubi and cangjie."
   :group 'leim)
 
-(defcustom pyim-enable-shortcode t
-  "启用输入联想词功能."
-  :type 'boolean)
-
-(defcustom pyim-english-input-switch-functions nil
-  "让 pyim 开启英文输入功能.
-
-这个变量的取值为一个函数列表，这个函数列表中的任意一个函数的
-运行结果为 t 时，pyim 开启英文输入功能。"
-  :type 'symbol)
-
 (define-obsolete-variable-alias 'pyim-page-select-finish-hook 'pyim-select-finish-hook "4.0")
 (defcustom pyim-select-finish-hook nil
   "Pyim 选词完成时运行的 hook."
@@ -80,22 +69,8 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
 编码的输入法。"
   :type 'boolean)
 
-(defcustom pyim-magic-converter nil
-  "将 “待选词条” 在 “上屏” 之前自动转换为其他字符串.
-这个功能可以实现“简转繁”，“输入中文得到英文”之类的功能。"
-  :type 'boolean)
-
 ;;;###autoload
 (defvar pyim-titles '("PYIM " "PYIM-EN " "PYIM-AU ") "Pyim 在 mode-line 中显示的名称.")
-
-(defvar pyim-input-ascii nil
-  "是否开启 pyim 英文输入模式.")
-
-(defvar pyim-force-input-chinese nil
-  "是否强制开启中文输入模式.
-
-这个变量只用于 `pyim-convert-string-at-point', 不要
-在其它地方使用。")
 
 (defvar pyim-load-hook nil)
 (defvar pyim-active-hook nil)
@@ -145,12 +120,8 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
   "Pyim 的 Keymap.")
 
 (pyim-register-local-variables
- '(pyim-input-ascii
-   pyim-process-translating
-   pyim-process-last-created-word
-   input-method-function
+ '(input-method-function
    inactivate-current-input-method-function
-   ;;pyim-english-input-switch-functions
    describe-current-input-method-function))
 
 ;; ** pyim 输入法定义
@@ -613,8 +584,8 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 (defun pyim-toggle-input-ascii ()
   "pyim 切换中英文输入模式。同时调整标点符号样式。"
   (interactive)
-  (setq pyim-input-ascii
-        (not pyim-input-ascii)))
+  (setq pyim-process-input-ascii
+        (not pyim-process-input-ascii)))
 
 ;; ** 主辅输入法切换功能
 (defun pyim-toggle-assistant-scheme ()
@@ -779,7 +750,7 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
         (run-hooks 'pyim-convert-string-at-point-hook)
         (when (> length 0)
           (pyim-add-unread-command-events code)
-          (setq pyim-force-input-chinese t)))
+          (setq pyim-process-force-input-chinese t)))
        ;; 当光标前的一个字符是标点符号时，半角/全角切换。
        ((pyim-string-match-p "[[:punct:]：－]" (pyim-char-before-to-string 0))
         (call-interactively 'pyim-punctuation-translate-at-point))
