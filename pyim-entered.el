@@ -34,15 +34,6 @@
   "Entered tools for pyim."
   :group 'pyim)
 
-(define-obsolete-variable-alias 'pyim-exhibit-delay-ms 'pyim-entered-exhibit-delay-ms "")
-(defcustom pyim-entered-exhibit-delay-ms 0
-  "输入或者删除拼音字符后等待多少毫秒后才显示可选词
-当用户快速输入连续的拼音时可提升用户体验.
-如果为 0 或者 nil, 则不等待立刻显示可选词."
-  :type 'integer)
-
-(defvar pyim-entered--exhibit-timer nil)
-
 (defvar pyim-entered-buffer " *pyim-entered-buffer*"
   "一个 buffer，用来处理用户已经输入的字符串： entered。
 
@@ -65,7 +56,7 @@ pyim 使用一个 buffer 来处理 entered, 以实现 “用户输入字符串�
 (defvar pyim-entered-longest nil
   "记录用户在连续选词之前的最长输入，用于全拼输入法多音字矫正。")
 
-(defmacro pyim-with-entered-buffer (&rest forms)
+(defmacro pyim-entered-with-entered-buffer (&rest forms)
   (declare (indent 0) (debug t))
   `(with-current-buffer (get-buffer-create pyim-entered-buffer)
      ,@forms))
@@ -77,7 +68,7 @@ pyim 使用一个 buffer 来处理 entered, 以实现 “用户输入字符串�
 point-before, 返回 entered buffer 中 point 之前的字符串，如果
 TYPE 取值为 point-after, 返回 entered buffer 中 point 之后的字符
 串。"
-  (pyim-with-entered-buffer
+  (pyim-entered-with-entered-buffer
     (cond
      ((bobp) (buffer-string))
      ((eq type 'point-before)
@@ -88,7 +79,7 @@ TYPE 取值为 point-after, 返回 entered buffer 中 point 之后的字符
 
 (defun pyim-entered-erase-buffer ()
   "清除 `pyim-entered-buffer' 的内容"
-  (pyim-with-entered-buffer
+  (pyim-entered-with-entered-buffer
     (erase-buffer)))
 
 ;; * Footer
