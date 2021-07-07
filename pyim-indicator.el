@@ -63,47 +63,62 @@ Indicator 用于显示输入法当前输入状态（英文还是中文）。"
 (defvar pyim-indicator-last-input-method-title nil
   "记录上一次 `current-input-method-title' 的取值。")
 
-(defun pyim-indicator-daemon (func)
+(defun pyim-indicator-start-daemon (func)
   "Indicator daemon, 用于实时显示输入法当前输入状态。"
   (unless pyim-indicator-original-cursor-color
     (setq pyim-indicator-original-cursor-color
           (face-attribute 'cursor :background)))
-  (pyim-indicator-daemon-stop)
-  (setq pyim-indicator-timer
-        (run-with-timer
-         nil pyim-indicator-timer-repeat
-         #'pyim-indicator-daemon-function func)))
+  (unless (timerp pyim-indicator-timer)
+    (setq pyim-indicator-timer
+          (run-with-timer
+           nil pyim-indicator-timer-repeat
+           #'pyim-indicator-daemon-function func))))
 
-(defun pyim-indicator-daemon-stop ()
+(defun pyim-indicator-stop-daemon ()
   "Stop indicator daemon."
   (interactive)
   (when (timerp pyim-indicator-timer)
-    (cancel-timer pyim-indicator-timer)))
+    (cancel-timer pyim-indicator-timer)
+    (setq pyim-indicator-timer nil))
+  (pyim-indicator-revert-cursor-color))
 
 (defun pyim-indicator-daemon-function (func)
   "`pyim-indicator-daemon' 内部使用的函数。"
-  (when (equal current-input-method "pyim")
-    (ignore-errors
-      (let ((chinese-input-p
-             (and (functionp func)
-                  (funcall func))))
-        (funcall pyim-indicator chinese-input-p)))))
+  (ignore-errors
+    (let ((chinese-input-p
+           (and (functionp func)
+                (funcall func))))
+      (funcall pyim-indicator current-input-method chinese-input-p))))
 
-(defun pyim-indicator-default (chinese-input-p)
-  "Pyim 默认使用的 indicator, 主要通过光标颜色和 mode-line 来显示输入状态。"
-  (if chinese-input-p
-      (progn
-        (setq current-input-method-title (nth 0 pyim-indicator-modeline-string))
-        (set-cursor-color (nth 0 pyim-indicator-cursor-color)))
-    (setq current-input-method-title (nth 1 pyim-indicator-modeline-string))
-    (set-cursor-color
-     (or (nth 1 pyim-indicator-cursor-color)
-         pyim-indicator-original-cursor-color)))
+(defun pyim-indicator-revert-cursor-color ()
+  "将 cursor 颜色重置到 pyim 启动之前的状态。"
+  (when pyim-indicator-original-cursor-color
+    (set-cursor-color pyim-indicator-original-cursor-color)))
+
+(defun pyim-indicator-update-mode-line ()
+  "更新 mode-line."
   (unless (eq pyim-indicator-last-input-method-title
               current-input-method-title)
     (force-mode-line-update)
     (setq pyim-indicator-last-input-method-title
           current-input-method-title)))
+
+(defun pyim-indicator-default (current-input-method chinese-input-p)
+  "Pyim 默认使用的 indicator, 主要通过光标颜色和 mode-line 来显示输入状态。"
+  (if (not (equal current-input-method "pyim"))
+      (progn
+        ;; 大多数情况是因为用户切换 buffer, 新 buffer 中
+        ;; pyim 没有启动，重置 cursor 颜色。
+        (set-cursor-color pyim-indicator-original-cursor-color))
+    (if chinese-input-p
+        (progn
+          (setq current-input-method-title (nth 0 pyim-indicator-modeline-string))
+          (set-cursor-color (nth 0 pyim-indicator-cursor-color)))
+      (setq current-input-method-title (nth 1 pyim-indicator-modeline-string))
+      (set-cursor-color
+       (or (nth 1 pyim-indicator-cursor-color)
+           pyim-indicator-original-cursor-color))))
+  (pyim-indicator-update-mode-line))
 
 ;; * Footer
 (provide 'pyim-indicator)
