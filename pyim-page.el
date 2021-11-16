@@ -132,6 +132,8 @@ non-nil，说明，补全已经用完了.
           whole
         (pyim-page-end t)))))
 
+(declare-function pyim-probe-exwm-environment "pyim-probe")
+
 (defun pyim-page-refresh (&optional hightlight-current)
   "刷新 page 页面的函数.
 
@@ -201,12 +203,12 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
           ;; 在 minibuffer 中输入中文时，使用当前输入的
           ;; 下一行来显示候选词。
           (pyim-page-minibuffer-message
-           (concat "\n" (pyim-page-style:minibuffer page-info)))
+           (pyim-page-style:minibuffer page-info))
         ;; 在普通 buffer 中输入中文时，使用 `pyim-page-tooltip'
         ;; 指定的方式来显示候选词。
         (let ((message-log-max nil))
           (cond
-           ((pyim-exwm-enable-p)
+           ((pyim-probe-exwm-environment)
             ;; when exwm-xim is used, page should be showed
             ;; in minibuffer.
             (message (pyim-page-style:exwm page-info)))
@@ -441,7 +443,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
 +------------------------------------+
 | [ni hao]: 1.你好 2.你号 ...  (1/9) |
 +------------------------------------+"
-  (format "[%s]: %s(%s/%s)"
+  (format " \t[%-15s]:%s(%s/%s)"
           (pyim-page-preview-create)
           (pyim-page-menu-create
            (gethash :candidates page-info)

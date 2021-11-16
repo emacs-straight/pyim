@@ -51,6 +51,16 @@
 运行结果为 t 时，pyim 开启英文输入功能。"
   :type 'symbol)
 
+(defcustom pyim-force-input-chinese-functions
+  (list 'pyim-probe-exwm-environment
+        'pyim-probe-xwidget-webkit-environment)
+  "让 pyim 强制输入中文.
+
+这个变量的取值为一个函数列表，这个函数列表中的任意一个函数的运行
+结果为 t 时，pyim 将强制输入中文功能,无视
+`pyim-english-input-switch-functions' 的设置."
+  :type 'symbol)
+
 (defcustom pyim-exhibit-delay-ms 0
   "输入或者删除拼音字符后等待多少毫秒后才显示可选词
 当用户快速输入连续的拼音时可提升用户体验.
@@ -164,21 +174,32 @@
 (defun pyim-process-auto-switch-english-input-p ()
   "判断是否 *根据环境自动切换* 为英文输入模式，这个函数处理变量：
 `pyim-english-input-switch-functions'"
-  (let* ((func-or-list pyim-english-input-switch-functions))
-    (and (cl-some (lambda (x)
-                    (if (functionp x)
-                        (funcall x)
-                      nil))
-                  (cond ((functionp func-or-list) (list func-or-list))
-                        ((listp func-or-list) func-or-list)
-                        (t nil))))))
+  (let ((func-or-list pyim-english-input-switch-functions))
+    (cl-some (lambda (x)
+               (when (functionp x)
+                 (funcall x)))
+             (cond ((functionp func-or-list) (list func-or-list))
+                   ((listp func-or-list) func-or-list)
+                   (t nil)))))
+
+(defun pyim-process-force-input-chinese-p ()
+  "判断是否强制输入中文，这个函数主要处理变量：
+`pyim-force-input-chinese-functions'."
+  (let ((func-or-list pyim-force-input-chinese-functions))
+    (or pyim-process-force-input-chinese
+        (cl-some (lambda (x)
+                   (when (functionp x)
+                     (funcall x)))
+                 (cond ((functionp func-or-list) (list func-or-list))
+                       ((listp func-or-list) func-or-list)
+                       (t nil))))))
 
 (defun pyim-process-input-chinese-p ()
   "确定 pyim 是否需要启动中文输入模式."
   (let* ((scheme-name (pyim-scheme-name))
          (first-chars (pyim-scheme-get-option scheme-name :first-chars))
          (rest-chars (pyim-scheme-get-option scheme-name :rest-chars)))
-    (and (or pyim-process-force-input-chinese
+    (and (or (pyim-process-force-input-chinese-p)
              (and (not pyim-process-input-ascii)
                   (not (pyim-process-auto-switch-english-input-p))))
          (if (not (string< "" (pyim-entered-get 'point-before)))
@@ -189,7 +210,7 @@
 
 (defun pyim-process-indicator-function ()
   "Indicator function."
-  (or pyim-process-force-input-chinese
+  (or (pyim-process-force-input-chinese-p)
       (and (not pyim-process-input-ascii)
            (not (pyim-process-auto-switch-english-input-p)))))
 
@@ -223,13 +244,7 @@
     ;; 延迟1秒异步处理 entered, pyim 内置的输入法目前不使用异步获取
     ;; 词条的方式，主要用于 pyim-liberime 支持。
     (setq pyim-process-run-async-timer
-          (run-with-timer
-           1 nil
-           (lambda ()
-             (if (functionp 'make-thread)
-                 (make-thread #'pyim-process-run-with-thread
-                              "pyim-process-run-with-thread")
-               (pyim-process-run-with-thread)))))
+          (run-with-timer 1 nil #'pyim-process-async-ui-refresh))
     ;; 自动上屏功能
     (let ((autoselector-results
            (mapcar (lambda (x)
@@ -290,7 +305,7 @@
   "测试 CMD 是否是一个 pyim self insert command."
   (member cmd pyim-process-self-insert-commands))
 
-(defun pyim-process-run-with-thread ()
+(defun pyim-process-async-ui-refresh ()
   "Function used by `pyim-process-run-async-timer'"
   (let* ((scheme-name (pyim-scheme-name))
          (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
