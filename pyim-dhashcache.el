@@ -48,8 +48,8 @@
 (defvar pyim-dhashcache-shortcode2word nil)
 (defvar pyim-dhashcache-icode2word nil)
 (defvar pyim-dhashcache-ishortcode2word nil)
-(defvar pyim-dhashcache-update-shortcode2word nil)
-(defvar pyim-dhashcache-update-ishortcode2word nil)
+(defvar pyim-dhashcache-update-shortcode2word-p nil)
+(defvar pyim-dhashcache-update-ishortcode2word-p nil)
 (defvar pyim-dhashcache-update-icode2word-p nil)
 (defvar pyim-dhashcache-update-code2word-running-p nil)
 
@@ -89,10 +89,10 @@
 
 如果 FORCE 为真，强制加载缓存。"
   (interactive)
-  (when (or force (not pyim-dhashcache-update-ishortcode2word))
+  (when (or force (not pyim-dhashcache-update-ishortcode2word-p))
     ;; NOTE: 这个变量按理说应该在回调函数里面设置，但 async 在某些情况下会卡死，
     ;; 这个变量无法设置为 t, 导致后续产生大量的 emacs 进程，极其影响性能。
-    (setq pyim-dhashcache-update-ishortcode2word t)
+    (setq pyim-dhashcache-update-ishortcode2word-p t)
     (async-start
      `(lambda ()
         ,@(pyim-dhashcache-async-inject-variables)
@@ -121,7 +121,7 @@
                     pyim-dhashcache-ishortcode2word))
          pyim-dhashcache-ishortcode2word)
         (pyim-dcache-save-variable 'pyim-dhashcache-ishortcode2word))
-     (lambda (result)
+     (lambda (_)
        (pyim-dcache-set-variable 'pyim-dhashcache-ishortcode2word t)))))
 
 (defun pyim-dhashcache-update-shortcode2word (&optional force)
@@ -129,10 +129,10 @@
 
 如果 FORCE 为真，强制运行。"
   (interactive)
-  (when (or force (not pyim-dhashcache-update-shortcode2word))
+  (when (or force (not pyim-dhashcache-update-shortcode2word-p))
     ;; NOTE: 这个变量按理说应该在回调函数里面设置，但 async 在某些情况下会卡死，
     ;; 这个变量无法设置为 t, 导致后续产生大量的 emacs 进程，极其影响性能。
-    (setq pyim-dhashcache-update-shortcode2word t)
+    (setq pyim-dhashcache-update-shortcode2word-p t)
     (async-start
      `(lambda ()
         ,@(pyim-dhashcache-async-inject-variables)
@@ -165,7 +165,7 @@
          pyim-dhashcache-shortcode2word)
         (pyim-dcache-save-variable 'pyim-dhashcache-shortcode2word)
         nil)
-     (lambda (result)
+     (lambda (_)
        (pyim-dcache-set-variable 'pyim-dhashcache-shortcode2word t)))))
 
 (defun pyim-dhashcache-get-path (variable)
@@ -234,8 +234,8 @@ DCACHE 是一个 code -> words 的 hashtable.
   (let* ((code2word-file (pyim-dhashcache-get-path 'pyim-dhashcache-code2word))
          (word2code-file (pyim-dhashcache-get-path 'pyim-dhashcache-word2code))
          (code2word-md5-file (pyim-dhashcache-get-path 'pyim-dhashcache-code2word-md5)))
-    (when (and (or force (not (equal dicts-md5 (pyim-dcache-get-value-from-file code2word-md5-file))))
-               (not pyim-dhashcache-update-code2word-running-p))
+    (when (or force (and (not (equal dicts-md5 (pyim-dcache-get-value-from-file code2word-md5-file)))
+                         (not pyim-dhashcache-update-code2word-running-p)))
       (setq pyim-dhashcache-update-code2word-running-p t)
       ;; use hashtable
       (async-start
@@ -245,7 +245,7 @@ DCACHE 是一个 code -> words 的 hashtable.
           (let ((dcache (pyim-dhashcache-generate-dcache-file ',dict-files ,code2word-file)))
             (pyim-dhashcache-generate-word2code-dcache-file dcache ,word2code-file))
           (pyim-dcache-save-value-to-file ',dicts-md5 ,code2word-md5-file))
-       (lambda (result)
+       (lambda (_)
          (pyim-dcache-set-variable 'pyim-dhashcache-code2word t)
          (pyim-dcache-set-variable 'pyim-dhashcache-word2code t)
          (setq pyim-dhashcache-update-code2word-running-p nil))))))
@@ -313,7 +313,7 @@ code 对应的中文词条了。
          pyim-dhashcache-icode2word)
         (pyim-dcache-save-variable 'pyim-dhashcache-icode2word)
         nil)
-     (lambda (result)
+     (lambda (_)
        (pyim-dcache-set-variable 'pyim-dhashcache-icode2word t)))))
 
 (defun pyim-dhashcache-upgrade-icode2word ()
