@@ -164,13 +164,11 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
 4. 这个函数最终会返回需要插入到 buffer 的字符串。
 
 这个部份的代码涉及许多 emacs 低层函数，相对复杂，不容易理解，有兴
-趣的朋友可以参考：
-1. `quail-input-method' 相关函数。
-2. elisp 手册相关章节:
-   1. Invoking the Input Method
-   2. Input Methods
-   3. Miscellaneous Event Input Features
-   4. Reading One Event"
+趣的朋友可以参考 elisp 手册相关章节:
+1. Invoking the Input Method
+2. Input Methods
+3. Miscellaneous Event Input Features
+4. Reading One Event"
   ;; Check the possibility of translating KEY.
   ;; If KEY is nil, we can anyway start translation.
   (if (or (integerp key) (null key))
@@ -178,10 +176,7 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
       (let* ((echo-keystrokes 0)
              (help-char nil)
              (overriding-terminal-local-map pyim-mode-map)
-             ;; (generated-events nil)
              (input-method-function nil)
-             ;; Quail package 用这个变量来控制是否在 buffer 中
-             ;; 插入 preview string, pyim *强制* 将其设置为 nil
              (input-method-use-echo-area nil)
              (modified-p (buffer-modified-p))
              last-command-event last-command this-command)
@@ -276,12 +271,20 @@ pyim 使用函数 `pyim-activate' 启动输入法的时候，会将变量
   (setq-local input-method-function #'pyim-input-method)
   nil)
 
-;; ** pyim 从 minibuffer 退出功能
-(declare-function quail-exit-from-minibuffer "quail" ())
+;; ** 取消激活功能
+(define-obsolete-function-alias 'pyim-inactivate 'pyim-deactivate "4.0.0")
+(defun pyim-deactivate ()
+  "取消 pyim 的激活状态."
+  (interactive)
+  (pyim-kill-local-variables)
+  (kill-local-variable 'input-method-function)
+  (pyim-process-stop-daemon)
+  (run-hooks 'pyim-deactivate-hook))
 
+;; ** pyim 从 minibuffer 退出功能
 (defun pyim-exit-from-minibuffer ()
   "Pyim 从 minibuffer 退出."
-  (quail-exit-from-minibuffer)
+  (deactivate-input-method)
   (when (<= (minibuffer-depth) 1)
     (remove-hook 'minibuffer-exit-hook 'pyim-exit-from-minibuffer)))
 
@@ -366,13 +369,20 @@ SILENT 设置为 t 是，不显示提醒信息。"
           (message "将词条: %S 插入 personal file。" output))))))
 
 ;; ** 导入词条功能
-(defun pyim-import (file &optional merge-method)
+(define-obsolete-face-alias 'pyim-import 'pyim-import-words-and-counts "4.0")
+(defun pyim-import-words-and-counts (file &optional merge-method)
   "从 FILE 中导入词条以及词条对应的词频信息。
 
-MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表
-词条在词频缓存中的词频和待导入文件中的词频，函数返回值做为合并后的词频使用，
+导入的文件结构类似：
+
+  ;;; -*- coding: utf-8-unix -*-
+  你好 247
+  这是 312
+
+MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表词条在词频
+缓存中的词频和待导入文件中的词频，函数返回值做为合并后的词频使用，
 默认方式是：取两个词频的最大值。"
-  (interactive "F导入词条相关信息文件: ")
+  (interactive "F导入词条和词频信息文件: ")
   (with-temp-buffer
     (let ((coding-system-for-read 'utf-8-unix))
       (insert-file-contents file))
@@ -398,7 +408,7 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表
   ;; 更新相关的 dcache
   (pyim-process-update-personal-words)
 
-  (message "pyim: 词条相关信息导入完成！"))
+  (message "PYIM: 词条和词频信息导入完成！"))
 
 ;; ** 删词功能
 (defun pyim-delete-words-in-file (file)
@@ -609,16 +619,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
   (interactive)
   (pyim-process-outcome-handle 'pyim-entered)
   (pyim-process-terminate))
-
-;; ** 取消激活功能
-(define-obsolete-function-alias 'pyim-inactivate 'pyim-deactivate "4.0.0")
-(defun pyim-deactivate ()
-  "取消 pyim 的激活状态."
-  (interactive)
-  (pyim-kill-local-variables)
-  (kill-local-variable 'input-method-function)
-  (pyim-process-stop-daemon)
-  (run-hooks 'pyim-deactivate-hook))
 
 ;; ** 中英文输入模式切换
 (defun pyim-toggle-input-ascii ()
