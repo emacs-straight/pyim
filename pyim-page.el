@@ -183,8 +183,9 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
    :candidates 关键字对应的位置，这个 hastable 最终会做为参数传递
    给 `pyim-page-style' 相关的函数，用于生成用于在选词框中显示的
    字符串。"
-  (let* ((end (pyim-page-end))
+  (let* ((message-log-max nil)
          (start (1- (pyim-page-start)))
+         (end (pyim-page-end))
          (candidates pyim-candidates)
          (candidate-showed
           (mapcar (lambda (x)
@@ -203,28 +204,26 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
     ;; Show page.
     (when (and (null unread-command-events)
                (null unread-post-input-method-events))
-      (if (eq (selected-window) (minibuffer-window))
-          ;; 在 minibuffer 中输入中文时，使用当前输入的
-          ;; 下一行来显示候选词。
-          (pyim-page-minibuffer-message
-           (concat pyim-page-minibuffer-separator
-                   (pyim-page-style:minibuffer page-info)))
-        ;; 在普通 buffer 中输入中文时，使用 `pyim-page-tooltip'
-        ;; 指定的方式来显示候选词。
-        (let ((message-log-max nil))
-          (cond
-           ((pyim-probe-exwm-environment)
-            ;; when exwm-xim is used, page should be showed
-            ;; in minibuffer.
-            (message (pyim-page-style:exwm page-info)))
-           (pyim-page-tooltip
-            (pyim-page-tooltip-show
-             (let ((func (intern (format "pyim-page-style:%S" pyim-page-style))))
-               (if (functionp func)
-                   (funcall func page-info)
-                 (pyim-page-style:two-lines page-info)))
-             (overlay-start pyim-preview-overlay)))
-           (t (message (pyim-page-style:minibuffer page-info)))))))))
+      (cond
+       ;; 在 minibuffer 中输入中文时，默认使用当前输入行来显示候选词。以前在
+       ;; minibuffer 中试用过 posframe, 在 linux 环境下，运行还不错，但在
+       ;; windows 环境下，似乎有很严重的性能问题，原因未知。
+       ((eq (selected-window) (minibuffer-window))
+        (pyim-page-minibuffer-message
+         (concat pyim-page-minibuffer-separator
+                 (pyim-page-style:minibuffer page-info))))
+       ;; 在 exwm 环境下使用 exwm-xim 输入中文时，使用 minibuffer 来显示 page。
+       ((pyim-probe-exwm-environment)
+        (message (pyim-page-style:exwm page-info)))
+       ;; 普通 buffer 中，使用 `pyim-page-tooltip' 指定的方式显示候选词。
+       (pyim-page-tooltip
+        (pyim-page-tooltip-show
+         (let ((func (intern (format "pyim-page-style:%S" pyim-page-style))))
+           (if (functionp func)
+               (funcall func page-info)
+             (pyim-page-style:two-lines page-info)))
+         (overlay-start pyim-preview-overlay)))
+       (t (message (pyim-page-style:minibuffer page-info)))))))
 
 (declare-function pyim-process-terminate "pyim-process")
 
