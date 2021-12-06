@@ -85,6 +85,36 @@
                       append (mapcar (lambda (l) (cons element l))
                                      (pyim-permutate-list list-tail)))))))
 
+(defun pyim-zip (lists &optional care-first-one)
+  "Zip LISTS and delete dups: ((a b c) (d e)) => (a d b e c).
+When CARE-FIRST-ONE is no-nil, ((a b c) (d e)) => (a d)."
+  (when care-first-one
+    (setq lists
+          (mapcar (lambda (x)
+                    (list (car x)))
+                  lists)))
+  (setq lists (remove nil lists))
+  (if (< (length lists) 2)
+      (car lists)
+    (let* ((n (apply #'max (mapcar #'length lists)))
+           (lists (mapcar
+                   (lambda (x)
+                     (append x (make-list (- n (length x)) nil)))
+                   lists)))
+      (delete-dups
+       (flatten-tree
+        (apply #'cl-mapcar
+               #'list lists))))))
+
+(defun pyim-subconcat (list &optional sep)
+  "Concat sublist of LIST with SEP: (a b c d) => (abcd abc ab)."
+  (let ((n (length list))
+        output)
+    (dotimes (i (- n 1))
+      (let ((list (cl-subseq list 0 (- n i))))
+        (push (mapconcat #'identity list (or sep "")) output)))
+    (nreverse output)))
+
 (defun pyim-char-before-to-string (num)
   "得到光标前第 `num' 个字符，并将其转换为字符串。"
   (let* ((point (point))
