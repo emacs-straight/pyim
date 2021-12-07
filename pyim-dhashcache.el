@@ -410,13 +410,28 @@ code 对应的中文词条了。
    pyim-dhashcache-icode2word)
   (remhash word pyim-dhashcache-iword2count))
 
-(defun pyim-dhashcache-insert-word-into-icode2word (word pinyin prepend)
-  "保存个人词到缓存."
+(defun pyim-dhashcache-insert-word-into-icode2word (word code prepend)
+  "将词条 WORD 插入到 icode2word 词库缓存 CODE 键对应的位置.
+
+默认 WORD 放到已有词条的最后，如果 PREPEND 为 non-nil, WORD 将放
+到已有词条的最前面。"
   (pyim-dhashcache-put
-    pyim-dhashcache-icode2word pinyin
+    pyim-dhashcache-icode2word code
     (if prepend
         `(,word ,@(remove word orig-value))
       `(,@(remove word orig-value) ,word))))
+
+(defun pyim-dhashcache-insert-word-into-ishortcode2word (word code)
+  "将词条 WORD 插入到 ishortcode2word 词库缓存 CODE 首字母字符串对应的位置."
+  (when (string-match-p "-" code)
+    (pyim-dhashcache-put
+      pyim-dhashcache-ishortcode2word
+      ;; ni-hao -> n-h
+      (mapconcat (lambda (x)
+                   (substring x 0 1))
+                 (split-string code "-")
+                 "-")
+      `(,word ,@(remove word orig-value)))))
 
 (defun pyim-dhashcache-search-word-code (string)
   (gethash string pyim-dhashcache-word2code))
