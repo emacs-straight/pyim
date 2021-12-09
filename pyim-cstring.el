@@ -46,94 +46,95 @@ codes 与这个字符串进行比较，然后选择一个最相似的 code 输�
 这个字符串主要用于全拼和双拼输入法的多音字矫正，一般使用用户输入
 生成的 imobjs 转换得到，保留了用户原始输入的许多信息。")
 
+(defun pyim-cstring-partition (string &optional to-cchar)
+  "STRING partition.
+
+1. Hello你好 -> (\"Hello\" \"你\" \"好\"), when TO-CCHAR is non-nil.
+2. Hello你好 -> (\"Hello\" \"你好\"), when TO-CCHAR is nil."
+  ;; NOTE: 使用5个\0作为分割符有没有其它副作用？有待观察。
+  (let ((sep (make-string 5 ?\0)))
+    (if (pyim-string-match-p "\\CC" string)
+        ;; 处理中英文混合的情况
+        (remove "" (split-string
+                    (replace-regexp-in-string
+                     (if to-cchar "\\(\\cc\\)" "\\(\\cc+\\)")
+                     (concat sep "\\1" sep) string)
+                    sep))
+      (if to-cchar
+          (cl-mapcar #'char-to-string string)
+        (list string)))))
+
+(defun pyim-cstring-substrings (cstring &optional max-length number)
+  "找出 CSTRING 中所有长度不超过 MAX-LENGTH 的子字符串，生成一个 alist。
+
+这个 alist 中的每个元素为：(子字符串 开始位置 结束位置), 参数
+NUMBER 用于递归，表示子字符串在 CSTRING 中的位置。"
+  (let ((number (or number 0)))
+    (cond
+     ((= (length cstring) 0) nil)
+     (t (append (pyim-cstring-substrings-1 cstring max-length number)
+                (pyim-cstring-substrings (substring cstring 1)
+                                         max-length (1+ number)))))))
+
+(defun pyim-cstring-substrings-1 (cstring max-length number)
+  "`pyim-cstring-substrings' 的内部函数。"
+  (cond
+   ((< (length cstring) 2) nil)
+   (t (append
+       (let ((length (length cstring)))
+         (when (<= length (or max-length 6))
+           (list (list cstring number (+ number length)))))
+       (pyim-cstring-substrings-1
+        (substring cstring 0 -1)
+        max-length number)))))
+
 ;; ** 中文字符串分词相关功能
 (defun pyim-cstring-split-to-list (chinese-string &optional max-word-length delete-dups prefer-short-word)
-  "一个基于 pyim 的中文分词函数。这个函数可以将中文字符
-串 CHINESE-STRING 分词，得到一个词条 alist，这个 alist 的元素
-都是列表，其中第一个元素为分词得到的词条，第二个元素为词条相对于
-字符串中的起始位置，第三个元素为结束位置。分词时，默认词条不超过
-6个字符，用户可以通过 MAX-WORD-LENGTH 来自定义，但值得注意的是：
-这个值设置越大，分词速度越慢。
+  "一个基于 pyim 的中文分词函数。这个函数可以将中文字符串
+CHINESE-STRING 分词，得到一个词条 alist，这个 alist 的元素都是列
+表，其中第一个元素为分词得到的词条，第二个元素为词条相对于字符串
+中的起始位置，第三个元素为结束位置。分词时，默认词条不超过6个字符，
+用户可以通过 MAX-WORD-LENGTH 来自定义，但值得注意的是：这个值设置
+越大，分词速度越慢。
 
 如果 DELETE-DUPS 设置为 non-nil, 一个中文字符串只保留一种分割方式。
 比如：
 
-  我爱北京天安门 => 我爱 北京 天安门
+     我爱北京天安门 => 我爱 北京 天安门
 
 如果 PREFER-SHORT-WORD 为 non-nil, 去重的时候则优先保留较短的词。
 
 注意事项：
 1. 这个工具使用暴力匹配模式来分词，*不能检测出* pyim 词库中不存在
-   的中文词条。
-2. 这个函数的分词速度比较慢，仅仅适用于中文短句的分词，不适用于
-   文章分词。根据评估，20个汉字组成的字符串需要大约0.3s， 40个
-   汉字消耗1s，随着字符串长度的增大消耗的时间呈几何倍数增加。"
-  ;;                   (("天安" 5 7)
-  ;; 我爱北京天安门 ->  ("天安门" 5 8)
-  ;;                    ("北京" 3 5)
-  ;;                    ("我爱" 1 3))
-  (cl-labels
-      ((get-possible-words-internal
-        ;; 内部函数，功能类似：
-        ;; ("a" "b" "c" "d") -> ("abcd" "abc" "ab")
-        (my-list number)
-        (cond
-         ((< (length my-list) 2) nil)
-         (t (append
-             (let* ((str (mapconcat #'identity my-list ""))
-                    (length (length str)))
-               (when (<= length (or max-word-length 6))
-                 (list (list str number (+ number length)))))
-             (get-possible-words-internal
-              (reverse (cdr (reverse my-list))) number)))))
-       (get-possible-words
-        ;; 内部函数，功能类似：
-        ;; ("a" "b" "c" "d") -> ("abcd" "abc" "ab" "bcd" "bc" "cd")
-        (my-list number)
-        (cond
-         ((null my-list) nil)
-         (t (append (get-possible-words-internal my-list number)
-                    (get-possible-words (cdr my-list) (1+ number)))))))
+的中文词条。
+2. 这个函数的分词速度比较慢，仅仅适用于中文短句的分词，不适用于文
+章分词。根据评估，20个汉字组成的字符串需要大约0.3s， 40个汉字消耗
+1s，随着字符串长度的增大消耗的时间呈几何倍数增加。"
+  ;; 如果 pyim 词库没有加载，加载 pyim 词库，确保 `pyim-dcache-get' 可以正常运行。
+  (pyim-dcache-init-variables)
 
-    ;; 如果 pyim 词库没有加载，加载 pyim 词库，
-    ;; 确保 `pyim-dcache-get' 可以正常运行。
-    (pyim-dcache-init-variables)
+  (let (result)
+    (dolist (string-list (pyim-cstring-substrings chinese-string max-word-length))
+      (let ((pinyin-list (pyim-cstring-to-pinyin (car string-list) nil "-" t)))
+        (dolist (pinyin pinyin-list)
+          (let ((words (pyim-dcache-get pinyin '(code2word)))) ; 忽略个人词库可以提高速度
+            (dolist (word words)
+              (when (equal word (car string-list))
+                (push string-list result)))))))
 
-    (let ((string-alist
-           (get-possible-words
-            (mapcar #'char-to-string
-                    (string-to-vector chinese-string))
-            1))
-          result)
-      (dolist (string-list string-alist)
-        (let ((pinyin-list (pyim-cstring-to-pinyin (car string-list) nil "-" t)))
-          (dolist (pinyin pinyin-list)
-            (let ((words (pyim-dcache-get pinyin '(code2word)))) ; 忽略个人词库可以提高速度
-              (dolist (word words)
-                (when (equal word (car string-list))
-                  (push string-list result)))))))
-
-      (if delete-dups
-          (cl-delete-duplicates
-           ;;  判断两个词条在字符串中的位置
-           ;;  是否冲突，如果冲突，仅保留一个，
-           ;;  删除其它。
-           result
-           :test (lambda (x1 x2)
-                   (let ((begin1 (nth 1 x1))
-                         (begin2 (nth 1 x2))
-                         (end1 (nth 2 x1))
-                         (end2 (nth 2 x2)))
-                     (not (or (<= end1 begin2)
-                              (<= end2 begin1)))))
-           :from-end prefer-short-word)
-        result))))
-
-;; (let ((str "医生随时都有可能被患者及其家属反咬一口"))
-;;   (benchmark 1 '(pyim-cstring-split-to-list str)))
-
-;; (let ((str "医生随时都有可能被患者及其家属反咬一口"))
-;;   (pyim-cstring-split-to-list str))
+    (if delete-dups
+        ;;  判断两个词条在字符串中的位置是否冲突，如果冲突，仅保留一个。
+        (cl-delete-duplicates
+         result
+         :test (lambda (x1 x2)
+                 (let ((begin1 (nth 1 x1))
+                       (begin2 (nth 1 x2))
+                       (end1 (nth 2 x1))
+                       (end2 (nth 2 x2)))
+                   (not (or (<= end1 begin2)
+                            (<= end2 begin1)))))
+         :from-end prefer-short-word)
+      result)))
 
 (defun pyim-cstring-split-to-string (string &optional prefer-short-word
                                             separator max-word-length)
@@ -144,21 +145,13 @@ codes 与这个字符串进行比较，然后选择一个最相似的 code 输�
 词条。默认最长词条不超过6个字符，用户可以通 MAX-WORD-LENGTH 来
 自定义词条的最大长度，但值得注意的是，这个值设置越大，分词速度越
 慢。"
-  (let ((string-list
-         (if (pyim-string-match-p "\\CC" string)
-             (split-string
-              (replace-regexp-in-string
-               "\\(\\CC+\\)" "@@@@\\1@@@@" string)
-              "@@@@")
-           (list string))))
-    (mapconcat
-     (lambda (str)
-       (when (> (length str) 0)
-         (if (not (pyim-string-match-p "\\CC" str))
-             (pyim-cstring-split-to-string-1
-              str prefer-short-word separator max-word-length)
-           (concat " " str " "))))
-     string-list "")))
+  (mapconcat (lambda (str)
+               (when (> (length str) 0)
+                 (if (not (pyim-string-match-p "\\CC" str))
+                     (pyim-cstring-split-to-string-1
+                      str prefer-short-word separator max-word-length)
+                   str)))
+             (pyim-cstring-partition string) (or separator " ")))
 
 (defun pyim-cstring-split-to-string-1 (chinese-string &optional prefer-short-word
                                                       separator max-word-length)
@@ -179,9 +172,9 @@ codes 与这个字符串进行比较，然后选择一个最相似的 code 输�
 
     ;; 在分词的位置插入空格或者用户指定的分隔符。
     (dotimes (i str-length)
-      (when (member (1+ i) position-list)
+      (when (and (> i 0) (member i position-list))
         (push (or separator " ") result))
-      (push (substring chinese-string i (1+ i))  result))
+      (push (substring chinese-string i (1+ i)) result))
     (setq result (nreverse result))
     (mapconcat #'identity result "")))
 
@@ -224,75 +217,46 @@ BUG: 当 STRING 中包含其它标点符号，并且设置 SEPERATER 时，结�
       (if return-list
           (list string)
         string)
-    (let (string-list pinyins-list pinyins-list-permutated pinyins-list-adjusted)
-
-      ;; 将汉字字符串转换为字符list，英文原样输出。
-      ;; 比如： “Hello银行” -> ("Hello" "银" "行")
-      (setq string-list
-            (if (pyim-string-match-p "\\CC" string)
-                ;; 处理中英文混合的情况
-                (split-string
-                 (replace-regexp-in-string
-                  "\\(\\cc\\)" "@@@@\\1@@@@" string)
-                 "@@@@")
-              ;; 如果词条只包含中文，使用`string-to-vector'
-              ;; 这样处理速度比较快。
-              (string-to-vector string)))
-
-      ;; 将上述汉字字符串里面的所有汉字转换为与之对应的拼音list。
-      ;; 比如： ("Hello" "银" "行") -> (("Hello") ("yin") ("hang" "xing"))
-      (mapc
-       (lambda (str)
-         ;; `string-to-vector' 得到的是 char vector, 需要将其转换为 string。
-         (when (numberp str)
-           (setq str (char-to-string str)))
-         (cond
-          ((> (length str) 1)
-           (push (list str) pinyins-list))
-          ((and (> (length str) 0)
-                (pyim-string-match-p "\\cc" str))
-           (push (pyim-pymap-cchar2py-get (string-to-char str))
-                 pinyins-list))
-          ((> (length str) 0)
-           (push (list str) pinyins-list))))
-       string-list)
-      (setq pinyins-list (nreverse pinyins-list))
+    (let (pinyins-list pinyins-list-adjusted)
+      ;; ("Hello" "银" "行") -> (("Hello") ("yin") ("hang" "xing"))
+      (setq pinyins-list
+            (mapcar (lambda (str)
+                      (if (pyim-string-match-p "\\cc" str)
+                          (pyim-pymap-cchar2py-get str)
+                        (list str)))
+                    (pyim-cstring-partition string t)))
 
       ;; 通过排列组合的方式, 重排 pinyins-list。
       ;; 比如：(("Hello") ("yin") ("hang" "xing")) -> (("Hello" "yin" "hang") ("Hello" "yin" "xing"))
-      (setq pinyins-list-permutated (pyim-permutate-list pinyins-list))
+      (setq pinyins-list
+            (pyim-permutate-list pinyins-list))
 
       ;; 使用 pyim 的安装的词库来校正多音字。
+      ;; FIXME：如果 string 包含非中文的字符，那么多音字矫正将不起作用。
       (when adjust-duo-yin-zi
-        ;; 确保 pyim 词库加载
         (pyim-dcache-init-variables)
-        (dolist (pinyin-list pinyins-list-permutated)
-          (let* ((py-str (mapconcat #'identity pinyin-list "-"))
+        (dolist (pylist pinyins-list)
+          (let* ((py-str (mapconcat #'identity pylist "-"))
                  (words-from-dicts
-                  ;; pyim-buffer-list 中第一个 buffer 对应的是个人词库文件
-                  ;; 个人词库文件中的词条，极有可能存在 *多音字污染*。
-                  ;; 这是由 pyim 保存词条的机制决定的。
                   (pyim-dcache-get py-str '(code2word))))
             (when (member string words-from-dicts)
-              (push pinyin-list pinyins-list-adjusted))))
+              (push pylist pinyins-list-adjusted))))
         (setq pinyins-list-adjusted
               (nreverse pinyins-list-adjusted)))
 
       ;; 返回拼音字符串或者拼音列表
       (let* ((pinyins-list
               (or pinyins-list-adjusted
-                  pinyins-list-permutated))
-             (list (mapcar
-                    (lambda (x)
-                      (mapconcat
-                       (lambda (str)
-                         (if shou-zi-mu
-                             (substring str 0 1)
-                           str))
-                       x separator))
-                    (if ignore-duo-yin-zi
-                        (list (car pinyins-list))
-                      pinyins-list))))
+                  pinyins-list))
+             (list (mapcar (lambda (x)
+                             (mapconcat (lambda (str)
+                                          (if shou-zi-mu
+                                              (substring str 0 1)
+                                            str))
+                                        x separator))
+                           (if ignore-duo-yin-zi
+                               (list (car pinyins-list))
+                             pinyins-list))))
         (if return-list
             list
           (mapconcat #'identity list " "))))))
@@ -441,8 +405,8 @@ CRITERIA 字符串一般是通过 imobjs 构建的，它保留了用户原始的
          (str-offset
           (when (and str-beginning-pos str-end-pos)
             (if (= current-pos str-end-pos)
-                (1+ (- str-end-pos str-beginning-pos))
-              (1+ (- current-pos str-beginning-pos)))))
+                (- str-end-pos str-beginning-pos)
+              (- current-pos str-beginning-pos))))
          str-offset-adjusted words-alist results)
 
     ;; 当字符串长度太长时， `pyim-cstring-split-to-list'
@@ -457,6 +421,7 @@ CRITERIA 字符串一般是通过 imobjs 构建的，它保留了用户原始的
         (setq str (substring str 0 (min 9 str-length)))))
 
     (cond
+     ((or (bobp) (eq (point) (line-beginning-position))) nil)
      ((and str (not (pyim-string-match-p "\\CC" str)))
       (setq words-alist
             (pyim-cstring-split-to-list str))
