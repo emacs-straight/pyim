@@ -44,6 +44,10 @@
 (require 'pyim-cstring)
 (require 'pyim-magic)
 
+(defgroup pyim-process nil
+  "Process for pyim."
+  :group 'pyim)
+
 (defcustom pyim-english-input-switch-functions nil
   "让 pyim 开启英文输入功能.
 
@@ -95,7 +99,7 @@
    pyim-process-translating
    pyim-process-last-created-word))
 
-(defun pyim-process-init-dcaches (&optional force save-caches)
+(defun pyim-process-init-dcaches (&optional force)
   "PYIM 流程，词库相关的初始化工作。"
   (pyim-recreate-local-variables)
   (pyim-pymap-cache-create)
@@ -241,10 +245,14 @@
           (or (delete-dups (pyim-candidates-create pyim-imobjs scheme-name))
               (list entered-to-translate)))
     (pyim-process-run-async-timer-reset)
-    ;; 延迟1秒异步处理 entered, pyim 内置的输入法目前不使用异步获取
-    ;; 词条的方式，主要用于 pyim-liberime 支持。
+    ;; 当用户选择词条时，如果停顿超过1秒，就激活异步流程，不同的输入法异步流程定
+    ;; 义也可能不同，比如：全拼输入法目前的异步流程是搜索当前 buffer 获取词条。
+    ;; 而 rime 的异步流程是获取所有的词条。
+    ;;
+    ;; 注意事项：异步流程对 page tooltip 有要求, 有些 page tooltip 是无法支持异
+    ;; 步流程的。
     (setq pyim-process-run-async-timer
-          (run-with-timer 1 nil #'pyim-process-async-ui-refresh))
+          (run-with-timer 1 nil #'pyim-process-run-async))
     ;; 自动上屏功能
     (let ((autoselector-results
            (mapcar (lambda (x)
@@ -305,16 +313,16 @@
   "测试 CMD 是否是一个 pyim self insert command."
   (member cmd pyim-process-self-insert-commands))
 
-(defun pyim-process-async-ui-refresh ()
+(defun pyim-process-run-async ()
   "Function used by `pyim-process-run-async-timer'"
-  (let* ((scheme-name (pyim-scheme-name))
-         (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
-    (when words
-      (setq pyim-candidates words)
-      (pyim-preview-refresh)
-      ;; NEED HELP: 目前只有 posframe 和 minibufer 可以正确处理异步刷新 page
-      (when (and (member pyim-page-tooltip '(posframe minibuffer))
-                 (not (eq (selected-window) (minibuffer-window))))
+  ;; NEED HELP: 目前只有 posframe 和 minibufer 两种 page 可以用于异步处理。
+  (when (and (member pyim-page-tooltip '(posframe minibuffer))
+             (not (eq (selected-window) (minibuffer-window))))
+    (let* ((scheme-name (pyim-scheme-name))
+           (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
+      (when words
+        (setq pyim-candidates words)
+        (pyim-preview-refresh)
         (pyim-page-refresh)))))
 
 (defun pyim-process-run-async-timer-reset ()

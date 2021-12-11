@@ -178,6 +178,19 @@ When CARE-FIRST-ONE is no-nil, ((a b c) (d e)) => (a d)."
                           (append key nil))
                   unread-command-events))))
 
+;; Fork from `company-dabbrev--time-limit-while' in company-mode."
+(defmacro pyim-time-limit-while (test limit &rest body)
+  "If TEST non-nil and time consumption < LIMIT, repeat eval BODY."
+  (declare (indent 2) (debug t))
+  (let ((start (make-symbol "start")))
+    `(let ((,start (current-time)))
+       (catch 'done
+         (while ,test
+           ,@body
+           (and ,limit
+                (> (float-time (time-since ,start)) ,limit)
+                (throw 'done 'pyim-time-out)))))))
+
 ;; * Footer
 (provide 'pyim-common)
 
