@@ -70,6 +70,29 @@
   (should (equal (pyim-scheme-get-option 'wubi :class) 'xingma)))
 
 ;; ** pyim-common 相关单元测试
+(ert-deftest pyim-tests-pyim-char-before/after-to-string ()
+  (with-temp-buffer
+    (insert "你好世界abc")
+    (print (pyim-char-before-to-string 0))
+    (should (equal (pyim-char-before-to-string 0) "c"))
+    (should (equal (pyim-char-before-to-string 1) "b"))
+    (backward-char 5)
+    (should (equal (pyim-char-before-to-string 0) "好"))
+    (should (equal (pyim-char-before-to-string 1) "你"))
+    (should (equal (pyim-char-after-to-string 0) "世"))
+    (should (equal (pyim-char-after-to-string 1) "界"))))
+
+(ert-deftest pyim-tests-pyim-dline-parse ()
+  (with-temp-buffer
+    (insert "ni-hao 你好")
+    (should (equal (pyim-dline-parse) '("ni-hao" "你好"))))
+  (with-temp-buffer
+    (insert "a-b-c-d")
+    (should (equal (pyim-dline-parse "-") '("a" "b" "c" "d"))))
+  (with-temp-buffer
+    (insert "你好 2")
+    (should (equal (pyim-dline-parse) '("你好" "2")))))
+
 (ert-deftest pyim-tests-pyim-permutate-list ()
   (should (equal (pyim-permutate-list '((a b) (c d e) (f)))
                  '((a c f)
@@ -93,12 +116,42 @@
                  '("a-b-c-d" "a-b-c" "a-b")))
   (should (equal (pyim-subconcat nil) nil)))
 
+(ert-deftest pyim-tests-pyim-string-distance ()
+  (should (equal (pyim-string-distance "nihaoma" "nihaoma") 0))
+  (should (equal (pyim-string-distance "nihaoma" "nhm") 4))
+  (should (equal (pyim-string-distance "nihaoma" "niham") 2))
+  (should (equal (pyim-string-distance "nihaoma" "nbm") 5))
+  (should (equal (pyim-string-distance "nihaoma" "wbc") 7))
+  (should (equal (pyim-string-distance "nihaoma" "ni") 5))
+  (should (equal (pyim-string-distance "nihaoma" "ci") 6)))
+
+(ert-deftest pyim-tests-pyim-add-unread-command-events ()
+  (let ((unread-command-events nil))
+    (pyim-add-unread-command-events ?a)
+    (should (equal unread-command-events
+                   '((no-record . 97))))
+    (pyim-add-unread-command-events "b")
+    (should (equal unread-command-events
+                   '((no-record . 98)
+                     (no-record . 97))))
+    (pyim-add-unread-command-events "cd")
+    (should (equal unread-command-events
+                   '((no-record . 99)
+                     (no-record . 100)
+                     (no-record . 98)
+                     (no-record . 97))))
+    (pyim-add-unread-command-events "e" t)
+    (should (equal unread-command-events
+                   '((no-record . 101))))
+    (pyim-add-unread-command-events nil t)
+    (should (equal unread-command-events nil))))
+
 (ert-deftest pyim-tests-pyim-time-limit-while ()
   (let ((time (current-time))
         (limit 0.1))
     (pyim-time-limit-while t limit
       t)
-    (should (< (float-time (time-since time)) (* limit 1.5)))))
+    (should (< (float-time (time-since time)) (* limit 2)))))
 
 ;; ** pyim-pymap 相关单元测试
 (ert-deftest pyim-tests-pyim-pymap ()
