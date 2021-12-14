@@ -103,11 +103,11 @@ VARIABLE 变量，FORCE-RESTORE 设置为 t 时，强制恢复，变量原来的
                         fallback-value
                         (make-hash-table :test #'equal))))))
 
-(defun pyim-dcache-save-variable (variable)
+(defun pyim-dcache-save-variable (variable &optional value)
   "将 VARIABLE 变量的取值保存到 `pyim-dcache-directory' 中对应文件中."
   (let ((file (expand-file-name (symbol-name variable)
                                 pyim-dcache-directory))
-        (value (symbol-value variable)))
+        (value (or value (symbol-value variable))))
     (pyim-dcache-save-value-to-file value file)))
 
 (defun pyim-dcache-save-value-to-file (value file)
@@ -207,9 +207,7 @@ non-nil，文件存在时将会提示用户是否覆盖，默认为覆盖模式"
 如果 FORCE 为真，强制加载。"
   (pyim-dcache-init-variables)
   (pyim-dcache-update-personal-words force)
-  (pyim-dcache-update-code2word force)
-  ;; 这个命令 *当前* 主要用于五笔输入法。
-  (pyim-dcache-update-shortcode2word force))
+  (pyim-dcache-update-code2word force))
 
 (defun pyim-dcache-update-code2word (&optional force)
   "读取并加载词库.
@@ -288,26 +286,8 @@ scheme 中的 :code-prefix-history 信息。"
 
 当词库文件加载完成后，pyim 就可以用这个函数从词库缓存中搜索某个
 code 对应的中文词条了."
-  (pyim-dcache-call-api 'get code from))
-
-;; ** 分割 code
-(defun pyim-dcache-code-split (code)
-  "将 CODE 分成 code-prefix 和 rest code."
-  (cond
-   ;; 处理 nil
-   ((not code) nil)
-   ;; 兼容性代码：旧版本的 pyim 使用一个标点符号作为 code-prefix
-   ((pyim-string-match-p "^[[:punct:]]" code)
-    (list (substring code 0 1) (substring code 1)))
-   ;; 拼音输入法不使用 code-prefix, 并且包含 -
-   ((pyim-string-match-p "-" code)
-    (list "" code))
-   ((not (pyim-string-match-p "[[:punct:]]" code))
-    (list "" code))
-   ;; 新 code-prefix 使用类似 "wubi/" 的格式。
-   (t (let ((x (split-string code "/")))
-        (list (concat (nth 0 x) "/")
-              (nth 1 x))))))
+  `(,@(pyim-dcache-call-api 'get code from)
+    ,@(pyim-pymap-py2cchar-get code t t)))
 
 ;; * Footer
 (provide 'pyim-dcache)

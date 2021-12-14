@@ -48,6 +48,8 @@
 (pyim-tests-add-dict "pyim-basedict.pyim")
 (pyim-dcache-init-variables)
 
+(defalias 'pyim-kill-emacs-hook-function #'ignore)
+
 ;; ** pyim-schemes 相关单元测试
 (ert-deftest pyim-tests-pyim-schemes ()
   (let ((pyim-default-scheme 'wubi))
@@ -568,7 +570,9 @@
 (ert-deftest pyim-tests-pyim-import-words-and-counts ()
   ;; 这个测试目前主要用于手工测试，在 github 上这个测试无法通过的。
   :expected-result :failed
-  (let ((file (make-temp-file "pyim-tests-import")))
+  (let ((pyim-dcache-directory
+         (file-name-as-directory (make-temp-name "pyim-dcache-")))
+        (file (make-temp-file "pyim-tests-import")))
     ;; 删除测试用词条
     (dolist (x '("测㤅" "测嘊" "测伌"))
       (pyim-process-delete-word x))
@@ -587,7 +591,6 @@
 测伌")
       (write-file file))
     (pyim-import-words-and-counts file (lambda (orig-count new-count) new-count) t)
-    (pyim-delete-word)
 
     ;; 测试词条是否存在
     (dolist (x '("测㤅" "测嘊" "测伌"))
@@ -595,6 +598,143 @@
     (should (equal (gethash "测㤅" pyim-dhashcache-iword2count) 76543))
     (should (equal (gethash "测嘊" pyim-dhashcache-iword2count) 34567))
     (should (equal (gethash "测伌" pyim-dhashcache-iword2count) 0))))
+
+;; ** pyim-dhashcache 相关单元测试
+(ert-deftest pyim-tests-pyim-dhashcache-get-shortcode ()
+  (should (equal (pyim-dhashcache-get-shortcode ".abcde") nil))
+  (should (equal (pyim-dhashcache-get-shortcode "wubi/abcde")
+                 '("wubi/abcd" "wubi/abc" "wubi/ab")))
+  (should (equal (pyim-dhashcache-get-shortcode "abcde") nil))
+  (should (equal (pyim-dhashcache-get-shortcode "ni-hao") nil))
+  (should (equal (pyim-dhashcache-get-shortcode "") nil)))
+
+(ert-deftest pyim-tests-pyim-dhashcache-get-path ()
+  (let ((pyim-dcache-directory "/tmp/dcache"))
+    (should (equal (pyim-dhashcache-get-path 'hello) "/tmp/dcache/hello"))
+    (should (equal (pyim-dhashcache-get-path "hello") nil))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-generate-file ()
+  (let ((dist-file (make-temp-file "pyim-dist-"))
+        (dcache-file (make-temp-file "pyim-dcache-"))
+        (word2code-dcache-file (make-temp-file "pyim-word2code-dcache-"))
+        output1 output2)
+    (with-temp-buffer
+      (insert ";; -*- coding: utf-8 -*--
+a 阿 啊 呵 腌 吖 嗄 锕 錒
+a-a 啊啊
+zuo-zuo-ye 做作业
+zuo-zuo-you-mang 作作有芒")
+      (write-region (point-min) (point-max) dist-file))
+    (pyim-dhashcache-generate-dcache-file (list dist-file) dcache-file)
+    (with-temp-buffer
+      (insert-file-contents dcache-file)
+      (setq output1 (read (current-buffer)))
+      (pyim-dhashcache-generate-word2code-dcache-file output1 word2code-dcache-file))
+    (with-temp-buffer
+      (insert-file-contents word2code-dcache-file)
+      (setq output2 (read (current-buffer))))
+
+    (should (equal (gethash "a" output1) '("阿" "啊" "呵" "腌" "吖" "嗄" "锕" "錒")))
+    (should (equal (gethash "a-a" output1) '("啊啊")))
+    (should (equal (gethash "zuo-zuo-you-mang" output1) '("作作有芒")))
+    (should (equal (gethash "啊" output2) '("a")))
+    (should (equal (gethash "啊啊" output2) nil))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-update-shortcode2word ()
+  (let ((code2word (make-hash-table :test #'equal))
+        (iword2count (make-hash-table :test #'equal))
+        (shortcode2word (make-hash-table :test #'equal))
+        output)
+
+    (puthash "wubi/a" '("戈") code2word)
+    (puthash "wubi/aa" '("式" "藏") code2word)
+    (puthash "wubi/aaa" '("工") code2word)
+    (puthash "wubi/aaaa" '("工" "㠭") code2word)
+    (puthash "wubi/aaab" '("㐂") code2word)
+    (puthash "wubi/aaae" '("𧝣") code2word)
+
+    (setq shortcode2word
+          (pyim-dhashcache-update-shortcode2word-1 code2word iword2count))
+
+    (should (equal (gethash "wubi/aa" shortcode2word)
+                   '(#("工" 0 1 (:comment "a"))
+                     #("㠭" 0 1 (:comment "aa"))
+                     #("㐂" 0 1 (:comment "ab"))
+                     #("𧝣" 0 1 (:comment "ae")))))
+    (should (equal (gethash "wubi/aaa" shortcode2word)
+                   '(#("工" 0 1 (:comment "a"))
+                     #("㠭" 0 1 (:comment "a"))
+                     #("㐂" 0 1 (:comment "b"))
+                     #("𧝣" 0 1 (:comment "e")))))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-update-ishortcode2word ()
+  (let ((icode2word (make-hash-table :test #'equal))
+        (iword2count (make-hash-table :test #'equal))
+        ishortcode2word)
+
+    (puthash "ni" '("你" "呢") icode2word)
+    (puthash "ni-hao" '("你好" "呢耗") icode2word)
+    (puthash "ni-huai" '("你坏") icode2word)
+
+    (setq ishortcode2word
+          (pyim-dhashcache-update-ishortcode2word-1
+           icode2word iword2count))
+
+    (should (equal (gethash "n-h" ishortcode2word)
+                   '("你好" "呢耗" "你坏")))
+    (should (equal (gethash "n" ishortcode2word)
+                   '("你" "呢")))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-put/delete ()
+  (let ((pyim-dhashcache-icode2word (make-hash-table :test #'equal)))
+    (puthash "ni-hao" '("你好" "呢耗") pyim-dhashcache-icode2word)
+    (pyim-dhashcache-put
+      pyim-dhashcache-icode2word "ni-hao"
+      (cons "呢毫" orig-value))
+    (pyim-dhashcache-put
+      pyim-dhashcache-icode2word "ni-bu-hao"
+      (list "你不好"))
+    (should (equal (gethash "ni-hao" pyim-dhashcache-icode2word) '("呢毫" "你好" "呢耗")))
+    (should (equal (gethash "ni-bu-hao" pyim-dhashcache-icode2word) '("你不好")))
+    (pyim-dhashcache-delete-word "你不好")
+    (should (equal (gethash "ni-bu-hao" pyim-dhashcache-icode2word) nil))
+    (pyim-dhashcache-delete-word "你好")
+    (should (equal (gethash "ni-hao" pyim-dhashcache-icode2word) '("呢毫" "呢耗")))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-update-iword2count ()
+  (let ((pyim-dhashcache-iword2count (make-hash-table :test #'equal)))
+    (puthash "你好" 1 pyim-dhashcache-iword2count)
+    (pyim-dhashcache-update-iword2count "你好")
+    (should (equal (gethash "你好" pyim-dhashcache-iword2count) 2))
+    (pyim-dhashcache-update-iword2count "你好" nil 10)
+    (should (equal (gethash "你好" pyim-dhashcache-iword2count) 10))
+    (pyim-dhashcache-update-iword2count "你好" nil (lambda (x) (* x 2)))
+    (should (equal (gethash "你好" pyim-dhashcache-iword2count) 20))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-export ()
+  (let ((file (make-temp-file "pyim-dcache-"))
+        (icode2word (make-hash-table :test #'equal)))
+    (puthash "yin-xing"
+             (list (propertize "银行" :noexport t)
+                   "因行") icode2word)
+    (pyim-dhashcache-export icode2word file)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (should (equal(buffer-string) ";;; -*- coding: utf-8-unix -*-
+yin-xing 因行
+")))))
+
+(ert-deftest pyim-tests-pyim-dhashcache-get ()
+  (let ((pyim-dhashcache-code2word (make-hash-table :test #'equal))
+        (pyim-dhashcache-icode2word (make-hash-table :test #'equal)))
+
+    (puthash "ni-hao" '("呢耗") pyim-dhashcache-icode2word)
+    (puthash "ni-hao" '("你好") pyim-dhashcache-code2word)
+
+    (should (equal (pyim-dhashcache-get "ni-hao" '(code2word)) '("你好")))
+    (should (equal (pyim-dhashcache-get "ni-hao" '(icode2word)) '("呢耗")))
+    (should (equal (pyim-dhashcache-get "ni-hao" '(code2word icode2word)) '("你好" "呢耗")))
+    (should (equal (pyim-dhashcache-get "ni-hao") '("呢耗" "你好")))))
 
 ;; ** pyim-dregcache 相关单元测试
 (ert-deftest pyim-tests-pyim-general ()
