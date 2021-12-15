@@ -89,7 +89,7 @@
         ;; ((string-match "^\\([a-z]+ \\|[a-z]+-[a-z]+ \\|[a-z]+-[a-z]+-[a-z]+ \\)\\(.*\\)" l)
         (let* ((pinyin (match-string 1 l))
                (words (pyim-dregcache-sort-words (split-string (match-string 2 l) " "))))
-          (insert (format "%s\n" (concat pinyin (mapconcat #'identity words " "))))))
+          (insert (format "%s\n" (concat pinyin (string-join words " "))))))
        ;; 其他词
        ((string= l "")
         ;; skip empty line
@@ -328,13 +328,12 @@ DICT-FILES 是词库文件列表. DICTS-MD5 是词库的MD5校验码.
 
 (defun pyim-dregcache-init-variables ()
   "初始化 cache 缓存相关变量."
-  (pyim-dcache-set-variable
+  (pyim-dcache-init-variable
    'pyim-dregcache-iword2count
-   nil
    ;; dregcache 引擎也需要词频信息，第一次使用 dregcache 引擎的时候，
    ;; 自动导入 dhashcache 引擎的词频信息，以后两个引擎的词频信息就
    ;; 完全分开了。
-   (pyim-dcache-get-variable 'pyim-dhashcache-iword2count))
+   (pyim-dcache-get-value 'pyim-dhashcache-iword2count))
   (unless pyim-dregcache-icode2word
     (pyim-dregcache-update-personal-words t)))
 
@@ -343,16 +342,19 @@ DICT-FILES 是词库文件列表. DICTS-MD5 是词库的MD5校验码.
   (when pyim-debug (message "pyim-dregcache-save-personal-dcache-to-file called"))
   ;; 用户选择过的词存为标准辞典格式保存
   (when pyim-dregcache-icode2word
-    (pyim-dregcache-save-variable 'pyim-dregcache-icode2word
-                                  pyim-dregcache-icode2word))
+    (pyim-dregcache-save-variable
+     'pyim-dregcache-icode2word
+     pyim-dregcache-icode2word))
   ;; 词频
-  (pyim-dcache-save-variable 'pyim-dregcache-iword2count))
+  (pyim-dcache-save-variable
+   'pyim-dregcache-iword2count
+   pyim-dregcache-iword2count))
 
 (defun pyim-dregcache-export-words-and-counts ()
   "TODO"
   )
 
-(defun pyim-dregcache-update-iword2count (word &optional _prepend wordcount-handler)
+(defun pyim-dregcache-update-iword2count (word &optional wordcount-handler)
   "保存词频到缓存."
   (when pyim-debug (message "pyim-dregcache-update-iword2count. word=%s" word))
   (let* ((orig-value (gethash word pyim-dregcache-iword2count))

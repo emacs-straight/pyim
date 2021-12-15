@@ -92,9 +92,9 @@ IMOBJS 获得候选词条。"
 (defun pyim-candidates-create:quanpin (imobjs scheme-name &optional async)
   "`pyim-candidates-create' 处理全拼输入法的函数."
   (if async
-      ;; 使用当前的 entered 构建一个搜索中文的正则表达式, 然后使用这个正则表达式
-      ;; 在当前 buffer 中搜索词条。
-      (let ((str (pyim-entered-get)))
+      ;; 构建一个搜索中文的正则表达式, 然后使用这个正则表达式在当前 buffer 中搜
+      ;; 索词条。
+      (let ((str (string-join (pyim-codes-create (car imobjs) scheme-name))))
         (if (< (length str) 1)
             pyim-candidates
           ;; NOTE: 让第一个词保持不变是不是合理，有待进一步的观察。
@@ -153,16 +153,14 @@ IMOBJS 获得候选词条。"
                (> (length (car imobjs)) 1))
       (dolist (imobj imobjs)
         (let* ((w (pyim-dcache-get
-                   (mapconcat #'identity
-                              (pyim-codes-create imobj scheme-name 1)
-                              "-")
+                   (string-join (pyim-codes-create imobj scheme-name 1) "-")
                    '(ishortcode2word)))
-               (regexp1 (mapconcat #'identity
-                                   (pyim-codes-create imobj scheme-name)
-                                   "-"))
-               (regexp2 (mapconcat #'identity
-                                   (pyim-codes-create imobj scheme-name)
-                                   "[^-]*-"))
+               (regexp1 (string-join
+                         (pyim-codes-create imobj scheme-name)
+                         "-"))
+               (regexp2 (string-join
+                         (pyim-codes-create imobj scheme-name)
+                         "[^-]*-"))
                (w1 (cl-remove-if-not
                     (lambda (cstr)
                       (let ((py (pyim-cstring-to-pinyin cstr nil "-")))
@@ -179,17 +177,13 @@ IMOBJS 获得候选词条。"
     (dolist (imobj imobjs)
       (let* (;; 个人词条
              (w1 (pyim-dcache-get
-                  (mapconcat #'identity
-                             (pyim-codes-create imobj scheme-name)
-                             "-")
+                  (string-join (pyim-codes-create imobj scheme-name) "-")
                   (if pyim-enable-shortcode
                       '(icode2word ishortcode2word)
                     '(icode2word))))
              ;; 词库词条
              (w2 (pyim-dcache-get
-                  (mapconcat #'identity
-                             (pyim-codes-create imobj scheme-name)
-                             "-")
+                  (string-join (pyim-codes-create imobj scheme-name) "-")
                   (if pyim-enable-shortcode
                       '(code2word shortcode2word)
                     '(code2word))))

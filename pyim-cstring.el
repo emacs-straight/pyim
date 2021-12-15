@@ -176,7 +176,7 @@ CHINESE-STRING 分词，得到一个词条 alist，这个 alist 的元素都是�
         (push (or separator " ") result))
       (push (substring chinese-string i (1+ i)) result))
     (setq result (nreverse result))
-    (mapconcat #'identity result "")))
+    (string-join result)))
 
 (defun pyim-cstring-split-buffer ()
   "将一个 buffer 中的中文文章，进行分词操作。"
@@ -259,7 +259,7 @@ BUG: 当 STRING 中包含其它标点符号，并且设置 SEPERATER 时，结�
                              pinyins-list))))
         (if return-list
             list
-          (mapconcat #'identity list " "))))))
+          (string-join list " "))))))
 
 ;;;###autoload
 (defalias 'pyim-hanzi2pinyin-simple 'pyim-cstring-to-pinyin-simple)
@@ -275,16 +275,12 @@ code-prefix)。当RETURN-LIST 设置为 t 时，返回一个 code list。"
   (when (string-match-p "^\\cc+\\'" string)
     (let* ((prefix (pyim-scheme-get-option scheme-name :code-prefix))
            (func (intern (concat "pyim-cstring-to-xingma:" (symbol-name scheme-name))))
-           (dcache-codes (cl-remove-if-not
-                          (lambda (x)
-                            (equal (nth 0 (pyim-dcache-code-split x))
-                                   prefix))
-                          (sort (cl-copy-list (pyim-dcache-call-api 'search-word-code string))
-                                (lambda (a b) (> (length a) (length b))))))
-           (codes (or (mapcar
-                       (lambda (x)
-                         (nth 1 (pyim-dcache-code-split x)))
-                       dcache-codes)
+           (dcache-codes (mapcar (lambda (x)
+                                   (when (string-prefix-p prefix x)
+                                     (string-remove-prefix prefix x)))
+                                 (sort (cl-copy-list (pyim-dcache-call-api 'search-word-code string))
+                                       (lambda (a b) (> (length a) (length b))))))
+           (codes (or (remove nil dcache-codes)
                       (and (functionp func)
                            (funcall func string scheme-name)))))
       (when codes

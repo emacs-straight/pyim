@@ -518,9 +518,9 @@ alist 列表。"
 (defun pyim-process-create-code-criteria ()
   "创建 `pyim-cstring-to-code-criteria'."
   (setq pyim-cstring-to-code-criteria
-        (let ((str (mapconcat #'identity
-                              (pyim-codes-create (car (pyim-process-get-imobjs)) (pyim-scheme-name))
-                              "")))
+        (let ((str (string-join
+                    (pyim-codes-create (car (pyim-process-get-imobjs))
+                                       (pyim-scheme-name)))))
           (if (> (length pyim-cstring-to-code-criteria)
                  (length str))
               pyim-cstring-to-code-criteria
@@ -557,7 +557,7 @@ BUG：拼音无法有效地处理多音字。"
                    (or criteria pyim-cstring-to-code-criteria))))
       ;; 保存对应词条的词频
       (when (> (length word) 0)
-        (pyim-dcache-update-iword2count word prepend wordcount-handler))
+        (pyim-dcache-update-wordcount word (or wordcount-handler #'1+)))
       ;; 添加词条到个人缓存
       (dolist (code codes)
         (unless (pyim-string-match-p "[^ a-z-]" code)
