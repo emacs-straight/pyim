@@ -486,6 +486,17 @@
                            "Hello -yin-hang-hen-xing- Hi Hello -yin-hang-hen-heng- Hi "
                            "Hello -yin-hang-hen-hang- Hi")))))
 
+(ert-deftest pyim-tests-pyim-cstring-to-xingma ()
+  (let ((pyim-dhashcache-word2code (make-hash-table :test #'equal)))
+    (puthash "工" (list "wubi/aaaa" "cangjie/mlm" "gong") pyim-dhashcache-word2code)
+    (puthash "房" (list "wubi/yny") pyim-dhashcache-word2code)
+    (puthash "丛" (list "wubi/wwg") pyim-dhashcache-word2code)
+    (should (equal (pyim-cstring-to-xingma "工" 'wubi) "aaaa"))
+    (should (equal (pyim-cstring-to-xingma "工房" 'wubi) "aayn"))
+    (should (equal (pyim-cstring-to-xingma "工房丛" 'wubi) "ayww"))
+    (should (equal (pyim-cstring-to-xingma "工房丛房" 'wubi) "aywy"))
+    (should (equal (pyim-cstring-to-xingma "工" 'wubi t) '("aaaa")))))
+
 (ert-deftest pyim-tests-pyim-cstring-words-at-point ()
   (let ((pyim-dhashcache-code2word (make-hash-table :test #'equal)))
     (puthash "tian-an" (list "天安") pyim-dhashcache-code2word)
@@ -564,7 +575,18 @@
     (should (string-match-p regexp1 "大王"))
     (should (string-match-p regexp1 "当王"))
     (should (string-match-p regexp2 "大王"))
-    (should-not (string-match-p regexp2 "当王"))))
+    (should-not (string-match-p regexp2 "当王")))
+
+  (let ((pyim-default-scheme 'wubi)
+        (pyim-dhashcache-code2word (make-hash-table :test #'equal)))
+    (puthash "wubi/aaaa" (list "工" "恭恭敬敬") pyim-dhashcache-code2word)
+    (puthash "wubi/adww" (list "欺" "蒙古人" "其人" "欺人" "斯人" "惹人" "匧" "歁" "莢") pyim-dhashcache-code2word)
+    (should (equal (pyim-cregexp-build "aaaa") "\\(?:aaaa\\|[工恭]恭?敬?敬?\\)"))
+    (should (equal (pyim-cregexp-build "adww") "\\(?:adww\\|[其匧惹斯欺歁莢蒙][人古]?人?\\)"))
+    (should (equal (pyim-cregexp-build "aaaa'aaaa")
+                   "\\(?:\\(?:aaaa'\\|aaaa\\|[工恭]恭?敬?敬?\\)\\(?:aaaa\\|[工恭]恭?敬?敬?\\)\\)"))
+    (should (equal (pyim-cregexp-build-1 "aaaa'aaaa")
+                   "\\(?:aaaa'\\|aaaa\\|[工恭][恭]?[敬]?[敬]?\\)\\(?:aaaa\\|[工恭][恭]?[敬]?[敬]?\\)"))))
 
 ;; ** pyim-import 相关单元测试
 (ert-deftest pyim-tests-pyim-import-words-and-counts ()
@@ -598,6 +620,58 @@
     (should (equal (gethash "测㤅" pyim-dhashcache-iword2count) 76543))
     (should (equal (gethash "测嘊" pyim-dhashcache-iword2count) 34567))
     (should (equal (gethash "测伌" pyim-dhashcache-iword2count) 0))))
+
+;; ** pyim-dcache 相关单元测试
+(ert-deftest pyim-tests-pyim-dcache-save/read-variable-value ()
+  (let ((file (make-temp-file "pyim-dcache-"))
+        (value (make-hash-table :test #'equal)))
+    (puthash "ni-hao" (list "你好") value)
+    (pyim-dcache-save-value-to-file value file)
+    (should (equal (gethash "ni-hao" (pyim-dcache-get-value-from-file file))
+                   '("你好")))))
+
+(ert-deftest pyim-tests-pyim-dcache-handle-variable ()
+  (let ((pyim-dcache-directory
+         (file-name-as-directory (make-temp-name "pyim-dcache-")))
+        my/test:1)
+
+    (pyim-dcache-save-variable 'my/test:1 "hello")
+    (should (equal (pyim-dcache-get-value 'my/test:1) "hello"))
+
+    (setq my/test:1 "hi")
+    (pyim-dcache-reload-variable my/test:1)
+    (should (equal my/test:1 "hello"))
+
+    (setq my/test:1 "hi")
+    (pyim-dcache-init-variable my/test:1)
+    (should (equal my/test:1 "hi"))
+
+    (setq my/test:1 nil)
+    (pyim-dcache-init-variable my/test:1)
+    (should (equal my/test:1 "hello"))))
+
+(ert-deftest pyim-tests-pyim-dcache-export ()
+  (let ((pyim-dhashcache-iword2count (make-hash-table :test #'equal))
+        (pyim-dhashcache-icode2word (make-hash-table :test #'equal))
+        (file (make-temp-file "pyim-dcache-export-")))
+    (puthash "你好" 10 pyim-dhashcache-iword2count)
+    (puthash "尼耗" 1 pyim-dhashcache-iword2count)
+    (puthash "ni-hao" (list "你好" "尼耗") pyim-dhashcache-icode2word)
+    (pyim-dcache-export-words-and-counts file)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (should (equal (buffer-string)
+                     ";;; -*- coding: utf-8-unix -*-
+你好 10
+尼耗 1
+")))
+    (pyim-dcache-export-personal-words file)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (should (equal (buffer-string)
+                     ";;; -*- coding: utf-8-unix -*-
+ni-hao 你好 尼耗
+")))))
 
 ;; ** pyim-dhashcache 相关单元测试
 (ert-deftest pyim-tests-pyim-dhashcache-get-shortcodes ()

@@ -30,6 +30,7 @@
 (require 'cl-lib)
 (require 'pyim-common)
 (require 'pyim-dict)
+(require 'url-util)
 
 (defgroup pyim-dcache nil
   "Dcache for pyim."
@@ -84,31 +85,32 @@ dcache 文件的方法让 pyim 正常工作。")
   "初始化 dcache 缓存相关变量."
   (pyim-dcache-call-api 'init-variables))
 
-(defun pyim-dcache-init-variable (variable &optional fallback-value)
+(defmacro pyim-dcache-init-variable (variable &optional fallback-value)
   "初始化 VARIABLE.
 
 如果 VARIABLE 的值为 nil, 则使用 ‘pyim-dcache-directory’ 中对应文
 件的内容来设置 VARIABLE 变量, 如果此时 VARIABLE 取值还是 nil, 那
 么就将 VARIABLE 的值设置为 FALLBACK-VALUE."
-  (unless (symbol-value variable)
-    (set variable (or (pyim-dcache-get-value variable)
-                      fallback-value
-                      (make-hash-table :test #'equal)))))
+  `(when (and (symbolp ',variable) (not ,variable))
+     (setq ,variable (or (pyim-dcache-get-value ',variable)
+                         ,fallback-value
+                         (make-hash-table :test #'equal)))))
 
-(defun pyim-dcache-update-variable (variable)
-  "更新 VARIABLE"
-  (set variable (or (pyim-dcache-get-value variable)
-                    (make-hash-table :test #'equal))))
+(defmacro pyim-dcache-reload-variable (variable)
+  "从 `pyim-dcache-directory' 重新读取并设置 VARIABLE 的值."
+  `(when (symbolp ',variable)
+     (setq ,variable (or (pyim-dcache-get-value ',variable)
+                         (make-hash-table :test #'equal)))))
 
 (defun pyim-dcache-get-value (variable)
   "从 `pyim-dcache-directory' 中读取与 VARIABLE 对应的文件中保存的值."
-  (let ((file (expand-file-name (symbol-name variable)
+  (let ((file (expand-file-name (url-hexify-string (symbol-name variable))
                                 pyim-dcache-directory)))
     (pyim-dcache-get-value-from-file file)))
 
 (defun pyim-dcache-save-variable (variable value)
   "将 VARIABLE 变量的取值保存到 `pyim-dcache-directory' 中对应文件中."
-  (let ((file (expand-file-name (symbol-name variable)
+  (let ((file (expand-file-name (url-hexify-string (symbol-name variable))
                                 pyim-dcache-directory)))
     (pyim-dcache-save-value-to-file value file)))
 
@@ -144,7 +146,8 @@ dcache 文件的方法让 pyim 正常工作。")
 
 (defun pyim-dcache-get-value-from-file (file)
   "读取保存到 FILE 里面的 value."
-  (when (file-exists-p file)
+  (when (and (> (length file) 0)
+             (file-exists-p file))
     (with-temp-buffer
       (insert-file-contents file)
       (ignore-errors
