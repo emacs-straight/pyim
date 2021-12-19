@@ -95,8 +95,19 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
     (while (< i 256)
       (define-key map (vector i) #'pyim-self-insert-command)
       (setq i (1+ i)))
-    (dolist (i (number-sequence ?0 ?9))
-      (define-key map (char-to-string i) #'pyim-select-word-by-number))
+    (dolist (i (number-sequence 0 9))
+      (define-key map (kbd (number-to-string i))
+                  (lambda ()
+                    (interactive)
+                    (pyim-select-word-by-number i))))
+    (dolist (x '(("<f1>" . 1)
+                 ("<f2>" . 2)
+                 ("<f3>" . 3)
+                 ("<f4>" . 4)))
+      (define-key map (kbd (car x))
+                  (lambda ()
+                    (interactive)
+                    (pyim-select-subword-by-number (cdr x)))))
     (define-key map " " #'pyim-select-word)
     (define-key map (kbd "C-SPC") #'pyim-select-word-simple)
     (define-key map [backspace] #'pyim-delete-backward-char)
@@ -212,7 +223,7 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
               ;; (message "unread-command-events: %s" unread-command-events)
               (pyim-process-terminate))))
         ;; (message "return: %s" (pyim-process-get-outcome))
-        (pyim-process-get-outcome nil t))
+        (pyim-process-get-outcome nil t t))
     ;; Since KEY doesn't start any translation, just return it.
     ;; But translate KEY if necessary.
     (char-to-string key)))
@@ -379,7 +390,7 @@ SILENT 设置为 t 是，不显示提醒信息。"
 导入的文件结构类似：
 
   ;;; -*- coding: utf-8-unix -*-
-  ;; 词条 计数 拼音(可选)
+  ;; 词条 计数 对应编码(可选)
   你好 247
   这是 312
 
@@ -390,12 +401,10 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表词�
   ;; 导入词条和词频之前需要加载 dcaches.
   (when (or silent
             (yes-or-no-p "PYIM 词条导入注意事项：
-
-如果文件没有提供拼音，导入词条时会自动添加，这时个人词库缓存中会
-添加一些不合理的词条信息，比如：ying-xing 银行，这些词条的文本属
-性 :noexport 会设置为 t, 等用户再次输入这个词条的时候，通过用户的
-输入进行多音字矫正，对应的 :noexport 就会删除。
-
+1. 这个命令对多音字处理比较粗糙，可能会导入一些不合常理的词条记录，
+   (比如：ying-xing 银行），但不影响 PYIM 正常使用。
+2. 这个命令也可以用于形码输入法，比如：五笔，不过需要形码输入法有
+   编码反查功能。
 => 确定继续导入吗？"))
     (pyim-process-init-dcaches)
     (with-temp-buffer
@@ -404,19 +413,21 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表词�
       (goto-char (point-min))
       (forward-line 1)
       (while (not (eobp))
-        (let* ((pyim-default-scheme 'quanpin)
-               (content (pyim-dline-parse))
+        (let* ((content (pyim-dline-parse))
                (word (car content))
                (count (string-to-number
                        (or (car (cdr content)) "0")))
-               (criteria (car (cdr (cdr content)))))
-          (pyim-process-create-word
-           word nil
-           (lambda (x)
-             (funcall (or merge-method #'max)
-                      (or x 0)
-                      count))
-           criteria))
+               (criteria (car (cdr (cdr content))))
+               output)
+          (setq output
+                (pyim-process-create-word
+                 word nil
+                 (lambda (x)
+                   (funcall (or merge-method #'max)
+                            (or x 0)
+                            count))
+                 criteria))
+          (message "* 导入 %S" output))
         (forward-line 1)))
     ;; 保存一下用户选择过的词生成的缓存和词频缓存，
     ;; 因为使用 async 机制更新 dcache 时，需要从 dcache 文件
@@ -548,8 +559,9 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     ;; 在全拼输入法中，这个假设大多数情况是成立的，但在型码输入法
     ;; 中，比如五笔输入法，就不成立，好在型码输入法一般不需要多次
     ;; 选择。
-    (if (or (< length-selected-word (length imobj)) ;是否有未转换的光标前字符串
-            (> (length (pyim-process-get-entered 'point-after)) 0)) ;是否有光标后字符串
+    (if (and (not (pyim-process-select-subword-p)) ;以词定字的时候，不连续选择，处理起来太复杂。
+             (or (< length-selected-word (length imobj)) ;是否有未转换的光标前字符串
+                 (> (length (pyim-process-get-entered 'point-after)) 0))) ;是否有光标后字符串
         (progn
           (pyim-process-with-entered-buffer
             ;; 把光标前已转换的 entered 字符串, 从 entered字符串里面剪
@@ -569,9 +581,10 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
       ;;    这样的话，一个新词要输入两遍之后才可能出现在第一位。
       ;; 3. pyim 在启动的时候，会使用词频信息，对个人词库作一次排序。
       ;;    用作 pyim 下一次使用。
-      (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
-          (pyim-process-create-word (pyim-process-get-outcome) t)
-        (pyim-process-create-word (pyim-process-get-outcome)))
+      (unless (pyim-process-select-subword-p) ;NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
+        (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
+            (pyim-process-create-word (pyim-process-get-outcome) t)
+          (pyim-process-create-word (pyim-process-get-outcome))))
 
       (pyim-process-terminate)
       ;; pyim 使用这个 hook 来处理联想词。
@@ -591,10 +604,11 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
           (delete-region (point-min) (point)))
         (pyim-process-run))
     ;; 型码输入法，只考虑将词条保存到个人词库，用于调整词频，单字不保存。
-    (when (> (length (pyim-process-get-outcome)) 1)
-      (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
-          (pyim-process-create-word (pyim-process-get-outcome) t)
-        (pyim-process-create-word (pyim-process-get-outcome))))
+    (unless (pyim-process-select-subword-p) ;NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
+      (when (> (length (pyim-process-get-outcome)) 1)
+        (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
+            (pyim-process-create-word (pyim-process-get-outcome) t)
+          (pyim-process-create-word (pyim-process-get-outcome)))))
     (pyim-process-terminate)
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
@@ -610,9 +624,9 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
             (pyim-process-terminate))
         (let ((index (if (numberp n)
                          (- n 1)
-                       (- last-command-event ?1)))
+                       0))
               (end (pyim-page-end)))
-          (if (= index -1) (setq index 9) nil)
+          (when (= index -1) (setq index 9))
           (if (> (+ index (pyim-page-start)) end)
               (pyim-page-refresh)
             (pyim-process-set-candidate-position
@@ -621,6 +635,12 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     ;; 有些输入法使用数字键编码，这种情况下，数字键就
     ;; 不能用来选词了。
     (call-interactively #'pyim-self-insert-command)))
+
+(defun pyim-select-subword-by-number (&optional n)
+  "以词定字功能。"
+  (interactive)
+  (pyim-process-toggle-set-subword-info (or n 1))
+  (pyim-process-run t))
 
 ;; ** 取消当前输入功能
 (defun pyim-quit-clear ()
