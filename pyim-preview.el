@@ -29,7 +29,7 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 (require 'pyim-common)
-(require 'pyim-magic)
+(require 'pyim-outcome)
 
 (defgroup pyim-preview nil
   "Preview libs for pyim."
@@ -85,7 +85,7 @@ pyim 会使用 Emacs overlay 机制在 *待输入buffer* 光标处高亮显示�
         (when (string< "" rest)
           (setq preview (concat preview rest)))))
     (setq preview
-          (pyim-magic-convert
+          (pyim-outcome-magic-convert
            (pyim-outcome-get-subword preview)))
     ;; Delete old preview string.
     (pyim-preview-delete-string)

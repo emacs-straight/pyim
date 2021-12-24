@@ -7,9 +7,9 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 3.9.6
+;; Version: 3.9.7
 ;; Keywords: convenience, Chinese, pinyin, input-method
-;; Package-Requires: ((emacs "24.4") (async "1.6") (xr "1.13"))
+;; Package-Requires: ((emacs "25.1") (async "1.6") (xr "1.13"))
 
 ;; This file is part of GNU Emacs.
 
@@ -45,7 +45,6 @@
   "Pyim is a Chinese input method support quanpin, shuangpin, wubi and cangjie."
   :group 'leim)
 
-(define-obsolete-variable-alias 'pyim-page-select-finish-hook 'pyim-select-finish-hook "4.0")
 (defcustom pyim-select-finish-hook nil
   "Pyim 选词完成时运行的 hook."
   :type 'hook)
@@ -61,7 +60,6 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
 来构建适合自己的 hook 函数。"
   :type 'hook)
 
-(define-obsolete-variable-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "4.0")
 (defcustom pyim-select-word-by-number t
   "使用数字键来选择词条.
 
@@ -73,15 +71,6 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
 (defvar pyim-title "PYIM ")
 
 (defvar pyim-load-hook nil)
-
-(define-obsolete-variable-alias
-  'pyim-active-hook
-  'pyim-activate-hook "4.0.0")
-
-(define-obsolete-variable-alias
-  'pyim-inactive-hook
-  'pyim-deactivate-hook "4.0.0")
-
 (defvar pyim-activate-hook nil)
 (defvar pyim-deactivate-hook nil)
 
@@ -126,12 +115,12 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
     (define-key map "\M-b" #'pyim-backward-imelem)
     (define-key map "\C-e" #'pyim-end-of-line)
     (define-key map "\C-a" #'pyim-beginning-of-line)
-    (define-key map "=" #'pyim-page-next-page)
-    (define-key map "-" #'pyim-page-previous-page)
-    (define-key map "\C-n" #'pyim-page-next-word)
-    (define-key map "\C-p" #'pyim-page-previous-word)
-    (define-key map "\M-n" #'pyim-page-next-page)
-    (define-key map "\M-p" #'pyim-page-previous-page)
+    (define-key map "=" #'pyim-next-page)
+    (define-key map "-" #'pyim-previous-page)
+    (define-key map "\C-n" #'pyim-next-word)
+    (define-key map "\C-p" #'pyim-previous-word)
+    (define-key map "\M-n" #'pyim-next-page)
+    (define-key map "\M-p" #'pyim-previous-page)
     (define-key map "\C-m" #'pyim-quit-no-clear)
     (define-key map [return] #'pyim-quit-no-clear)
     (define-key map "\C-c" #'pyim-quit-clear)
@@ -233,8 +222,6 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
 (register-input-method "pyim" "UTF-8" #'pyim-activate pyim-title)
 
 ;; ** PYim 输入法启动功能
-(define-obsolete-function-alias 'pyim-active 'pyim-activate "4.0.0")
-
 ;;;###autoload
 (defun pyim-activate (&optional _args)
   "pyim 启动函数.
@@ -286,7 +273,6 @@ pyim 使用函数 `pyim-activate' 启动输入法的时候，会将变量
   (pyim-process-save-dcaches t))
 
 ;; ** 取消激活功能
-(define-obsolete-function-alias 'pyim-inactivate 'pyim-deactivate "4.0.0")
 (defun pyim-deactivate ()
   "取消 pyim 的激活状态."
   (interactive)
@@ -383,7 +369,6 @@ SILENT 设置为 t 是，不显示提醒信息。"
           (message "将词条: %S 插入 personal file。" output))))))
 
 ;; ** 导入词条功能
-(define-obsolete-function-alias 'pyim-import 'pyim-import-words-and-counts "4.0")
 (defun pyim-import-words-and-counts (file &optional merge-method silent)
   "从 FILE 中导入词条以及词条对应的词频信息。
 
@@ -439,6 +424,10 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表词�
 
     (message "PYIM: 词条和词频信息导入完成！")))
 
+;; ** 导出功能
+(defalias 'pyim-export-words-and-counts 'pyim-dcache-export-words-and-counts)
+(defalias 'pyim-export-personal-words 'pyim-dcache-export-personal-words)
+
 ;; ** 删词功能
 (defun pyim-delete-words-in-file (file)
   "从个人词库缓存中批量删除 FILE 文件中列出的词条.
@@ -491,7 +480,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     (message "请首先高亮选择需要删除的词条。")))
 
 ;; ** 选词功能
-(define-obsolete-function-alias 'pyim-page-select-word-simple 'pyim-select-word-simple "4.0")
 (defun pyim-select-word-simple ()
   "从选词框中选择当前词条.
 这个函数与 `pyim-select-word' 的区别是：
@@ -505,7 +493,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     (pyim-process-outcome-handle 'candidate))
   (pyim-process-terminate))
 
-(define-obsolete-function-alias 'pyim-page-select-word 'pyim-select-word "4.0")
 (defun pyim-select-word ()
   "从选词框中选择当前词条，然后删除该词条对应拼音。"
   (interactive)
@@ -613,7 +600,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
 
-(define-obsolete-function-alias 'pyim-page-select-word-by-number 'pyim-select-word-by-number "4.0")
 (defun pyim-select-word-by-number (&optional n)
   "使用数字编号来选择对应的词条。"
   (interactive)
@@ -641,6 +627,12 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
   (interactive)
   (pyim-process-toggle-set-subword-info (or n 1))
   (pyim-process-run t))
+
+;; ** 翻页和翻词功能
+(defalias 'pyim-previous-page #'pyim-page-previous-page)
+(defalias 'pyim-next-page #'pyim-page-next-page)
+(defalias 'pyim-previous-word #'pyim-page-previous-word)
+(defalias 'pyim-next-word #'pyim-page-next-word)
 
 ;; ** 取消当前输入功能
 (defun pyim-quit-clear ()
@@ -679,19 +671,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
     (pyim-process-run)))
 
 ;; ** PYIM 输入操作命令
-(define-obsolete-function-alias 'pyim-entered-delete-backward-char 'pyim-delete-backward-char "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-forward-char 'pyim-delete-forward-char "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-forward-char 'pyim-delete-forward-char "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-backward-imelem 'pyim-delete-backward-imelem "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-forward-imelem 'pyim-delete-forward-imelem "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-backward-imelem 'pyim-delete-backward-imelem "4.0")
-(define-obsolete-function-alias 'pyim-entered-delete-backward-char 'pyim-delete-backward-char "4.0")
-(define-obsolete-function-alias 'pyim-entered-forward-point 'pyim-forward-point "4.0")
-(define-obsolete-function-alias 'pyim-entered-backward-point 'pyim-backward-point "4.0")
-(define-obsolete-function-alias 'pyim-entered-forward-imelem 'pyim-forward-imelem "4.0")
-(define-obsolete-function-alias 'pyim-entered-backward-imelem 'pyim-backward-imelem "4.0")
-(define-obsolete-function-alias 'pyim-entered-end-of-line 'pyim-end-of-line "4.0")
-
 (defun pyim-forward-point ()
   "光标前移"
   (interactive)
@@ -862,6 +841,13 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 
 ;; ** pyim 中文字符串工具
 (require 'pyim-cstring)
+(defalias 'pyim-forward-word 'pyim-cstring-forward-word)
+(defalias 'pyim-backward-word 'pyim-cstring-backward-word)
+;; PYIM 重构以前使用的一些函数名称，alias 一下，便于兼容。
+(defalias 'pyim-hanzi2pinyin-simple 'pyim-cstring-to-pinyin-simple)
+(defalias 'pyim-hanzi2pinyin 'pyim-cstring-to-pinyin)
+(defalias 'pyim-hanzi2xingma 'pyim-cstring-to-xingma)
+(defalias 'pyim-cwords-at-point 'pyim-cstring-words-at-point)
 
 ;; ** pyim 中文 regexp 工具
 (require 'pyim-cregexp)
