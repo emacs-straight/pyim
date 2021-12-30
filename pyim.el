@@ -7,7 +7,7 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 4.0.2
+;; Version: 4.0.3
 ;; Keywords: convenience, Chinese, pinyin, input-method
 ;; Package-Requires: ((emacs "25.1") (async "1.6") (xr "1.13"))
 
@@ -412,7 +412,8 @@ MERGE-METHOD 是一个函数，这个函数需要两个数字参数，代表词�
                             (or x 0)
                             count))
                  criteria))
-          (message "* 导入 %S" output))
+          (unless silent
+            (message "* 导入 %S" output)))
         (forward-line 1)))
     ;; 保存一下用户选择过的词生成的缓存和词频缓存，
     ;; 因为使用 async 机制更新 dcache 时，需要从 dcache 文件
