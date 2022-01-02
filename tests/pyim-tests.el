@@ -677,6 +677,14 @@
 你好 10
 尼耗 1
 ")))
+    (pyim-dcache-export-words-and-counts file nil t)
+    (with-temp-buffer
+      (insert-file-contents file)
+      (should (equal (buffer-string)
+                     ";;; -*- coding: utf-8-unix -*-
+你好
+尼耗
+")))
     (pyim-dcache-export-personal-words file)
     (with-temp-buffer
       (insert-file-contents file)
@@ -821,13 +829,16 @@ yin-xing 因行
 
 (ert-deftest pyim-tests-pyim-dhashcache-get ()
   (let ((pyim-dhashcache-code2word (make-hash-table :test #'equal))
-        (pyim-dhashcache-icode2word (make-hash-table :test #'equal)))
+        (pyim-dhashcache-icode2word (make-hash-table :test #'equal))
+        (pyim-dhashcache-iword2count (make-hash-table :test #'equal)))
 
     (puthash "ni-hao" '("呢耗") pyim-dhashcache-icode2word)
     (puthash "ni-hao" '("你好") pyim-dhashcache-code2word)
+    (puthash "你好" 10 pyim-dhashcache-iword2count)
 
     (should (equal (pyim-dhashcache-get "ni-hao" '(code2word)) '("你好")))
     (should (equal (pyim-dhashcache-get "ni-hao" '(icode2word)) '("呢耗")))
+    (should (equal (pyim-dhashcache-get "你好" '(iword2count)) '(10)))
     (should (equal (pyim-dhashcache-get "ni-hao" '(code2word icode2word)) '("你好" "呢耗")))
     (should (equal (pyim-dhashcache-get "ni-hao") '("呢耗" "你好")))))
 

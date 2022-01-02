@@ -28,9 +28,12 @@
 ;;; Code:
 ;; * 代码                                                           :code:
 (require 'cl-lib)
+;; Emacs 26.1 之前的版本无法安装 posframe.
 (require 'posframe nil t)
+;; popup 不是 GNU ELPA 包，所以 pyim 不能强制依赖它。
 (require 'popup nil t)
 (require 'pyim-common)
+(require 'pyim-preview)
 
 (eval-when-compile
   (require 'pyim-entered))
@@ -45,27 +48,47 @@
 细节信息请参考 `pyim-page-refresh' 的 docstring."
   :type 'number)
 
-(defcustom pyim-page-tooltip 'posframe
+(defcustom pyim-page-tooltip '(posframe popup minibuffer)
   "如何绘制 pyim 选词框.
 
 1. 当这个变量取值为 posframe 时，使用 posframe 包来绘制选词框，
-   如果使用 emacs26 图形版的用户推荐使用这个选项。
+   使用 emacs 26 图形版的用户推荐使用这个选项。
 2. 当这个变量取值为 popup 时，使用 popup-el 包来绘制选词框，
    这个选项可以在 emacs 图形版和终端版使用，速度没有 posframe 快，
-   有时会遇到选词框错位的问题；
-3. 当这个变量取值为 minibuffer 时，使用 minibuffer 做为选词框，
-   这个选项也作为其他选项不可用时的 fallback."
-  :type 'symbol)
+   偶尔会遇到选词框错位的问题。
+3. 当这个变量取值为 minibuffer 时，minibuffer 将做为选词框，
+   这个选项也作为其他选项不可用时的 fallback.
+4. 当这个变量的取值是为一个 list 时，pyim 将按照优先顺序动态
+   选择一个当前环境可用的 tooltip."
+  :type '(choice (repeat (choice (const posframe)
+                                 (const popup)
+                                 (const minibuffer)))
+                 (const posframe)
+                 (const popup)
+                 (const minibuffer)))
 
 (defcustom pyim-page-style 'two-lines
   "这个变量用来控制选词框的格式.
 
-pyim 内建的有三种选词框格式：
+pyim 内建的有四种选词框格式：
 
-1. one-line  单行选词框
-2. two-lines 双行选词框
-3. vertical  垂直选词框"
-  :type 'symbol)
+1. one-line    单行选词框
+2. two-lines   双行选词框
+3. vertical    垂直选词框
+4. minibuffer  单行选词框 (minibuffer 中专用)"
+  :type '(choice (const two-lines)
+                 (const one-line)
+                 (const vertical)
+                 (const minibuffer)))
+
+(defcustom pyim-page-tooltip-style-alist
+  '((minibuffer . minibuffer))
+  "pyim page tooltip 专用 page style 绑定设置表。
+
+这个表是一个 alist, 每个元素的 car 代表 tooltip, cdr 代表对应的
+page style."
+  :type '(alist :key-type symbol
+                :value-type symbol))
 
 (defcustom pyim-page-posframe-border-width 0
   "posframe的内间距。
@@ -97,14 +120,14 @@ Only useful when use posframe.")
   '((t (:background "gray44")))
   "使用以词选字功能时，选择的汉字所使用的 face.")
 
-(defvar pyim-page-tooltip-posframe-buffer " *pyim-page-tooltip-posframe-buffer*"
+(defvar pyim-page-posframe-buffer " *pyim-page-posframe-buffer*"
   "这个变量用来保存做为 page tooltip 的 posframe 的 buffer.")
 
-(defvar pyim-page-tooltip-popup nil
+(defvar pyim-page-last-popup nil
   "这个变量用来保存做为 page tooltip 的 popup.")
 
-(defvar pyim-page-minibuffer-last-message nil
-  "函数 `pyim-page-minibuffer-message' 上一次处理的消息字符串。")
+(defvar pyim-page-last-minibuffer-string nil
+  "函数 `pyim-page-show-with-minibuffer' 上一次处理的消息字符串。")
 
 (defun pyim-page-current-page ()
   "计算当前选择的词条在第几页面.
@@ -141,8 +164,6 @@ non-nil，说明，补全已经用完了.
       (if finish
           whole
         (pyim-page-end t)))))
-
-(declare-function pyim-probe-exwm-environment "pyim-probe")
 
 (defun pyim-page-refresh (&optional hightlight-current)
   "刷新 page 页面的函数.
@@ -189,8 +210,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
    :candidates 关键字对应的位置，这个 hastable 最终会做为参数传递
    给 `pyim-page-style' 相关的函数，用于生成用于在选词框中显示的
    字符串。"
-  (let* ((message-log-max nil)
-         (start (1- (pyim-page-start)))
+  (let* ((start (1- (pyim-page-start)))
          (end (pyim-page-end))
          (candidates pyim-candidates)
          (candidate-showed
@@ -201,7 +221,8 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
                         x)))
                   (cl-subseq candidates start end)))
          (pos (- (min pyim-candidate-position (length candidates)) start))
-         (page-info (make-hash-table)))
+         (page-info (make-hash-table))
+         (tooltip (pyim-page-get-valid-tooltip)))
     (puthash :current-page (pyim-page-current-page) page-info)
     (puthash :total-page (pyim-page-total-page) page-info)
     (puthash :candidates candidate-showed page-info)
@@ -210,25 +231,10 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
     ;; Show page.
     (when (and (null unread-command-events)
                (null unread-post-input-method-events))
-      (cond
-       ;; 在 minibuffer 中输入中文时，默认使用当前输入行来显示候选词。以前在
-       ;; minibuffer 中试用过 posframe, 在 linux 环境下，运行还不错，但在
-       ;; windows 环境下，似乎有很严重的性能问题，原因未知。
-       ((eq (selected-window) (minibuffer-window))
-        (pyim-page-minibuffer-message
-         (pyim-page-style:minibuffer page-info)))
-       ;; 在 exwm 环境下使用 exwm-xim 输入中文时，使用 minibuffer 来显示 page。
-       ((pyim-probe-exwm-environment)
-        (message (pyim-page-style:exwm page-info)))
-       ;; 普通 buffer 中，使用 `pyim-page-tooltip' 指定的方式显示候选词。
-       (pyim-page-tooltip
-        (pyim-page-tooltip-show
-         (let ((func (intern (format "pyim-page-style:%S" pyim-page-style))))
-           (if (functionp func)
-               (funcall func page-info)
-             (pyim-page-style:two-lines page-info)))
-         (overlay-start pyim-preview-overlay)))
-       (t (message (pyim-page-style:minibuffer page-info)))))))
+      (pyim-page-show
+       (pyim-page-info-format page-info tooltip)
+       (pyim-preview-start-point)
+       tooltip))))
 
 (declare-function pyim-process-terminate "pyim-process")
 
@@ -384,6 +390,15 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
          result)))
     (string-join (nreverse result) (or separator ""))))
 
+(defun pyim-page-info-format (page-info tooltip)
+  "将 PAGE-INFO 按照 `pyim-page-style' 格式化为选词框中显示的字符串。"
+  (let ((style (or (cdr (assoc tooltip pyim-page-tooltip-style-alist))
+                   pyim-page-style)))
+    (let ((func (intern (format "pyim-page-style:%S" style))))
+      (if (functionp func)
+          (funcall func page-info)
+        (pyim-page-style:two-lines page-info)))))
+
 (defun pyim-page-style:two-lines (page-info)
   "将 PAGE-INFO 格式化为选词框中显示的字符串.
 
@@ -449,7 +464,9 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
 +------------------------------------+
 | [ni hao]: 1.你好 2.你号 ...  (1/9) |
 +------------------------------------+"
-  (format "[%-15s]:%s(%s/%s)"
+  ;; 在 minibuffer 中显示 page 的时候，page 字符串直接插入到 minibuffer 现有的内
+  ;; 容中, 为了便于区分，在 page 后面添加一个显眼的字符。
+  (format "[%-15s]: %s(%s/%s) $ "
           (pyim-page-preview-create)
           (pyim-page-menu-create
            (gethash :candidates page-info)
@@ -459,95 +476,91 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
           (gethash :current-page page-info)
           (gethash :total-page page-info)))
 
-(defun pyim-page-style:exwm (page-info)
-  "专门用于 exwm 环境的 page style."
-  (format "[%s]: %s(%s/%s)"
-          (pyim-page-preview-create)
-          (pyim-page-menu-create
-           (gethash :candidates page-info)
-           (gethash :position page-info)
-           nil
-           (gethash :hightlight-current page-info))
-          (gethash :current-page page-info)
-          (gethash :total-page page-info)))
+(defun pyim-page-get-valid-tooltip ()
+  "获取一个可用的 tooltip."
+  (cond
+   ;; NOTE: 以前在 minibuffer 中试用过 posframe, linux 环境下运行效果还不错，但
+   ;; 在 windows 环境下，似乎有很严重的性能问题，原因未知。
+   ((eq (selected-window) (minibuffer-window)) 'minibuffer)
+   ;; 在 exwm-xim 环境下输入中文时，只能使用 minibuffer, 因为应用窗口遮挡的缘故，
+   ;; 其它方式不可用。
+   ((pyim-exwm-xim-environment-p) 'minibuffer)
+   (t (or (cl-find-if (lambda (tp)
+                        (or (and (eq tp 'posframe)
+                                 (functionp 'posframe-workable-p)
+                                 (posframe-workable-p))
+                            (and (eq tp 'popup)
+                                 (featurep 'popup))
+                            (eq tp 'minibuffer)))
+                      (if (listp pyim-page-tooltip)
+                          pyim-page-tooltip
+                        (list pyim-page-tooltip)))
+          'minibuffer))))
 
-(defun pyim-page-tooltip-show (string position)
+(defun pyim-page-show (string position tooltip)
   "在 POSITION 位置，使用 posframe 或者 popup 显示字符串 STRING."
-  (let ((tooltip pyim-page-tooltip))
-    (cond ((and (eq tooltip 'posframe)
-                (functionp 'posframe-workable-p)
-                (posframe-workable-p))
-           (posframe-show pyim-page-tooltip-posframe-buffer
-                          :string string
-                          :position position
-                          :min-width pyim-page-posframe-min-width
-                          :background-color (face-attribute 'pyim-page :background)
-                          :foreground-color (face-attribute 'pyim-page :foreground)
-                          :border-width pyim-page-posframe-border-width
-                          :border-color (face-attribute 'pyim-page-border :background)))
-          ((and (eq tooltip 'popup) (featurep 'popup))
-           (pyim-page-tooltip-popup-show :string string
-                                         :position position))
-          (t (let ((max-mini-window-height (+ pyim-page-length 2)))
-               (message string))))))
+  (cond ((eq tooltip 'posframe)
+         (posframe-show pyim-page-posframe-buffer
+                        :string string
+                        :position position
+                        :min-width pyim-page-posframe-min-width
+                        :background-color (face-attribute 'pyim-page :background)
+                        :foreground-color (face-attribute 'pyim-page :foreground)
+                        :border-width pyim-page-posframe-border-width
+                        :border-color (face-attribute 'pyim-page-border :background)))
+        ((eq tooltip 'popup)
+         (pyim-page-show-with-popup :string string
+                                    :position position))
+        (t (pyim-page-show-with-minibuffer string))))
 
-(defun pyim-page-minibuffer-message (string)
-  "当在 minibuffer 中使用 pyim 输入中文时，需要将
-minibuffer 原来显示的信息和 pyim 选词框整合在一起显示
-这个函数就是作这个工作。"
-  (message nil)
-  (let* ((inhibit-quit t)
-         (begin (point))
-         (length (length pyim-page-minibuffer-last-message))
-         (end (min (+ begin length) (point-max))))
-    (delete-region begin end)
-    (save-excursion
-      (insert
-       (setq pyim-page-minibuffer-last-message
-             (concat
-              (or pyim-page-minibuffer-separator
-                  (let* ((width (string-width (buffer-string)))
-                         (n (- (* 20 (+ 1 (/ width 20))) width)))
-                    (make-string n ?\ )))
-              string)))
-      (setq end (point)))
-    (sit-for 1000000)
-    (delete-region (point) (min end (point-max)))
-    (when quit-flag
-      (setq quit-flag nil)
-      (pyim-add-unread-command-events 7 t))))
+(defun pyim-page-show-with-minibuffer (string)
+  "使用 minibuffer 来显示 STRING。"
+  (let ((max-mini-window-height (+ pyim-page-length 2))
+        (message-log-max nil))
+    (if (not (eq (selected-window) (minibuffer-window)))
+        (message string)
+      (message nil)
+      ;; 异步获取词条的时候，上一次的 page 字符串可能还在 Minibuffer 中，所以首
+      ;; 先要将其去除，否则会出现两个 page.
+      (delete-char (length pyim-page-last-minibuffer-string))
+      (save-excursion
+        (insert
+         (setq pyim-page-last-minibuffer-string
+               (concat
+                (or pyim-page-minibuffer-separator
+                    (let* ((width (string-width (buffer-string)))
+                           (n (- (* 20 (+ 1 (/ width 20))) width)))
+                      (make-string n ?\ )))
+                string)))))))
 
 (declare-function 'popup-tip "popup")
 (declare-function 'popup-delete "popup")
 (defvar popup-version)
 
-(cl-defun pyim-page-tooltip-popup-show (&key string position)
+(cl-defun pyim-page-show-with-popup (&key string position)
   "Show STRING at POSITION with the help of popup-el."
-  (when pyim-page-tooltip-popup
-    (popup-delete pyim-page-tooltip-popup))
-  (setq pyim-page-tooltip-popup
-        (apply #'popup-tip
-               string
-               :point position
-               :around t
-               :margin 1
-               :nowait t
-               :nostrip t
+  (when pyim-page-last-popup
+    ;; 异步获取词条的时候，如果不把已经存在的 popup 删除，就会出现两个 page.
+    (popup-delete pyim-page-last-popup))
+  (setq pyim-page-last-popup
+        (apply #'popup-tip string
+               :point position :around t :nowait t :nostrip t
                ;; popup v0.5.9 以后才支持 face 参数
                (unless (version<= popup-version "0.5.8")
                  (list :face 'pyim-page)))))
 
 (defun pyim-page-hide ()
   "Hide pyim page."
-  (setq pyim-page-minibuffer-last-message nil)
-  (cond
-   ((and (eq pyim-page-tooltip 'popup)
-         (functionp 'popup-delete))
-    (popup-delete pyim-page-tooltip-popup))
-   ((and (eq pyim-page-tooltip 'posframe)
-         (functionp 'posframe-hide))
-    (posframe-hide pyim-page-tooltip-posframe-buffer))
-   (t nil)))
+  (let ((tooltip (pyim-page-get-valid-tooltip)))
+    (cond
+     ((eq tooltip 'popup)
+      (popup-delete pyim-page-last-popup))
+     ((eq tooltip 'posframe)
+      (posframe-hide pyim-page-posframe-buffer))
+     (t (when (eq (selected-window) (minibuffer-window))
+          ;; 从 minibuffer 中删除 page 字符串。
+          (delete-char (length pyim-page-last-minibuffer-string)))
+        (setq pyim-page-last-minibuffer-string nil)))))
 
 ;; * Footer
 (provide 'pyim-page)

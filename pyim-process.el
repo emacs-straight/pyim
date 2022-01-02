@@ -55,7 +55,7 @@
   :type 'symbol)
 
 (defcustom pyim-force-input-chinese-functions
-  (list 'pyim-probe-exwm-environment
+  (list 'pyim-probe-exwm-xim-environment
         'pyim-probe-xwidget-webkit-environment)
   "让 pyim 强制输入中文.
 
@@ -86,8 +86,8 @@
 (defvar pyim-process-translating nil
   "记录是否在转换状态.")
 
-(defvar pyim-process-last-created-word nil
-  "记录最近一次创建的词条， 用于实现快捷删词功能： `pyim-delete-last-word' .")
+(defvar pyim-process-last-created-words nil
+  "记录最近创建的词条， 用于实现快捷删词功能： `pyim-delete-last-word' .")
 
 (defvar pyim-process-run-async-timer nil
   "异步处理 entered 时，使用的 timer.")
@@ -99,8 +99,7 @@
 
 (pyim-register-local-variables
  '(pyim-process-input-ascii
-   pyim-process-translating
-   pyim-process-last-created-word))
+   pyim-process-translating))
 
 (defun pyim-process-init-dcaches (&optional force)
   "PYIM 流程，词库相关的初始化工作。"
@@ -281,7 +280,8 @@
                 (if (and str (stringp str))
                     (list str)
                   pyim-candidates-last)))
-          (pyim-process-outcome-handle 'candidate))
+          (pyim-process-outcome-handle 'candidate)
+          (pyim-process-create-word (pyim-process-get-outcome) t))
         ;; autoselector 机制已经触发的时候，如果发现 entered buffer 中
         ;; point 后面还有未处理的输入，就将其转到下一轮处理，这种情况
         ;; 很少出现，一般是型码输入法，entered 编辑的时候有可能触发。
@@ -303,7 +303,8 @@
                 (if (and str (stringp str))
                     (list str)
                   pyim-candidates)))
-          (pyim-process-outcome-handle 'candidate))
+          (pyim-process-outcome-handle 'candidate)
+          (pyim-process-create-word (pyim-process-get-outcome) t))
         (pyim-add-unread-command-events
          (pyim-entered-get 'point-after))
         (pyim-process-terminate))
@@ -555,21 +556,26 @@ WORDCOUNT-HANDLER 也可以是一个函数，其返回值将设置为 WORD 的�
 正多音字。
 
 BUG：拼音无法有效地处理多音字。"
-  (when (and (> (length word) 0)
-             ;; NOTE: 十二个汉字及以上的词条，加到个人词库里面用处不大，这是很主
-             ;; 观的一个数字，也许应该添加一个配置选项？
-             (< (length word) 12)
-             (not (pyim-string-match-p "\\CC" word)))
+  (when (and
+         ;; NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
+         (not (pyim-process-select-subword-p))
+         (> (length word) 0)
+         ;; NOTE: 十二个汉字及以上的词条，加到个人词库里面用处不大，这是很主
+         ;; 观的一个数字，也许应该添加一个配置选项？
+         (< (length word) 12)
+         (not (pyim-string-match-p "\\CC" word)))
     ;; PYIM 有些功能（比如：以词定字功能）会用到 text property, 保存词条之前将
     ;; text property 去除，防止不必要的数据进入 cache.
     (setq word (substring-no-properties word))
     ;; 记录最近创建的词条，用于快速删词功能。
-    (setq pyim-process-last-created-word word)
+    (setq pyim-process-last-created-words
+          (cons word (remove word pyim-process-last-created-words)))
     (let* ((scheme-name (pyim-scheme-name))
            (code-prefix (pyim-scheme-get-option scheme-name :code-prefix))
            (codes (pyim-cstring-to-codes
                    word scheme-name
                    (or criteria pyim-cstring-to-code-criteria))))
+      (pyim-candidates-add-possible-chief word)
       ;; 保存对应词条的词频
       (when (> (length word) 0)
         (pyim-dcache-update-wordcount word (or wordcount-handler #'1+)))

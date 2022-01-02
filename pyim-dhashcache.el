@@ -320,6 +320,9 @@ code 对应的中文词条了。
     (dolist (cache caches)
       (let* ((cache (ignore-errors (symbol-value cache)))
              (value (and cache (gethash code cache))))
+        ;; 处理 iword2count.
+        (unless (listp value)
+          (setq value (list value)))
         (when value
           (setq result (append result value)))))
     result))
@@ -448,6 +451,15 @@ code 对应的中文词条了。
              (puthash key new-value pyim-dhashcache-icode2word)
            (remhash key pyim-dhashcache-icode2word)))))
    pyim-dhashcache-icode2word)
+  (maphash
+   (lambda (key value)
+     (when (member word value)
+       (print value)
+       (let ((new-value (remove word value)))
+         (if new-value
+             (puthash key new-value pyim-dhashcache-ishortcode2word)
+           (remhash key pyim-dhashcache-ishortcode2word)))))
+   pyim-dhashcache-ishortcode2word)
   (remhash word pyim-dhashcache-iword2count))
 
 (defun pyim-dhashcache-insert-word-into-icode2word (word code prepend)
@@ -481,12 +493,15 @@ code 对应的中文词条了。
   "导出个人词库到 FILE."
   (pyim-dhashcache-export pyim-dhashcache-icode2word file confirm))
 
-(defun pyim-dhashcache-export-words-and-counts (file &optional confirm)
+(defun pyim-dhashcache-export-words-and-counts (file &optional confirm ignore-counts)
   (with-temp-buffer
     (insert ";;; -*- coding: utf-8-unix -*-\n")
     (maphash
      (lambda (key value)
-       (insert (format "%s %s\n" key value)))
+       (insert
+        (if ignore-counts
+            (format "%s\n" key)
+          (format "%s %s\n" key value))))
      pyim-dhashcache-iword2count)
     ;; 在默认情况下，用户选择过的词生成的缓存中存在的词条，
     ;; `pyim-dhashcache-iword2count' 中也一定存在，但如果用户
@@ -496,7 +511,10 @@ code 对应的中文词条了。
      (lambda (_ words)
        (dolist (word words)
          (unless (gethash word pyim-dhashcache-iword2count)
-           (insert (format "%s %s\n" word 0)))))
+           (insert
+            (if ignore-counts
+                (format "%s\n" word)
+              (format "%s %s\n" word 0))))))
      pyim-dhashcache-icode2word)
     (pyim-dcache-write-file file confirm)))
 

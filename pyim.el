@@ -455,9 +455,9 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 (defun pyim-delete-last-word ()
   "从个人词库中删除最新创建的词条。"
   (interactive)
-  (when pyim-process-last-created-word
-    (pyim-process-delete-word pyim-process-last-created-word)
-    (message "pyim: 从个人词库中删除词条 “%s” !" pyim-process-last-created-word)))
+  (when pyim-process-last-created-words
+    (pyim-process-delete-word (car pyim-process-last-created-words))
+    (message "pyim: 从个人词库中删除词条 “%s” !" (car pyim-process-last-created-words))))
 
 (defun pyim-delete-word-at-point (&optional number silent)
   "将光标前字符数为 NUMBER 的中文字符串从个人词库中删除
@@ -469,16 +469,25 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
         (message "词条: \"%s\" 已经从个人词库缓冲中删除。" string)))))
 
 (defun pyim-delete-word ()
-  "将高亮选择的词条从个人词库中删除。"
+  "从个人词库中删除词条。"
   (interactive)
-  (if mark-active
-      (let ((string (buffer-substring-no-properties
-                     (region-beginning) (region-end))))
-        (when (and (< (length string) 6)
-                   (> (length string) 0))
-          (pyim-process-delete-word string)
-          (message "将词条: %S 从 personal 缓冲中删除。" string)))
-    (message "请首先高亮选择需要删除的词条。")))
+  (cond
+   (mark-active
+    (let ((string (buffer-substring-no-properties
+                   (region-beginning) (region-end))))
+      (when (and (< (length string) 6)
+                 (> (length string) 0))
+        (pyim-process-delete-word string)
+        (message "将词条: %S 从 personal 缓冲中删除。" string)
+        (deactivate-mark))))
+   (t (let ((words (completing-read-multiple
+                    "请选择需要删除的词条(可多选): "
+                    pyim-process-last-created-words)))
+        (dolist (word words)
+          (pyim-process-delete-word word)
+          (setq pyim-process-last-created-words
+                (remove word pyim-process-last-created-words))
+          (message "将词条: %S 从 personal 缓冲中删除。" word))))))
 
 ;; ** 选词功能
 (defun pyim-select-word-simple ()
@@ -562,18 +571,7 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
             ;; 择更加好用。
             (goto-char (pyim-process-next-imelem-position 20 t 1)))
           (pyim-process-run))
-      ;; pyim 词频调整策略：
-      ;; 1. 如果一个词条是用户在输入过程中，自己新建的词条，那么就将这个词条
-      ;;    添加到个人词库的后面（不放置前面是为了减少误输词条的影响）。
-      ;; 2. 如果输入的词条，先前已经在候选词列表中，就自动将其放到第一位。
-      ;;    这样的话，一个新词要输入两遍之后才可能出现在第一位。
-      ;; 3. pyim 在启动的时候，会使用词频信息，对个人词库作一次排序。
-      ;;    用作 pyim 下一次使用。
-      (unless (pyim-process-select-subword-p) ;NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
-        (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
-            (pyim-process-create-word (pyim-process-get-outcome) t)
-          (pyim-process-create-word (pyim-process-get-outcome))))
-
+      (pyim-process-create-word (pyim-process-get-outcome) t)
       (pyim-process-terminate)
       ;; pyim 使用这个 hook 来处理联想词。
       (run-hooks 'pyim-select-finish-hook))))
@@ -591,12 +589,8 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
           ;; 字符串里面剪掉。
           (delete-region (point-min) (point)))
         (pyim-process-run))
-    ;; 型码输入法，只考虑将词条保存到个人词库，用于调整词频，单字不保存。
-    (unless (pyim-process-select-subword-p) ;NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
-      (when (> (length (pyim-process-get-outcome)) 1)
-        (if (member (pyim-process-get-outcome) (pyim-process-get-candidates))
-            (pyim-process-create-word (pyim-process-get-outcome) t)
-          (pyim-process-create-word (pyim-process-get-outcome)))))
+    ;; NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
+    (pyim-process-create-word (pyim-process-get-outcome) t)
     (pyim-process-terminate)
     ;; pyim 使用这个 hook 来处理联想词。
     (run-hooks 'pyim-select-finish-hook)))
