@@ -41,18 +41,24 @@
 (require 'pyim-scheme)
 
 (defvar pyim-dhashcache-count-types
-  '((day
-     ;; 用于生成类似 :20220206 这样的 key.
+  `((day
+     ;; 保存 day count 时用到的 key 的格式, 类似 :20220206
      :format ":%Y%m%d"
-     ;; 最多保存七天 count 到缓存。
+     ;; 在 dcache iword2count-log 中，一个词条最多保存七天的 day count, 这七天可
+     ;; 能是连续的，也可能不连续。
      :max-save-length 7
-     ;; 计算排序综合指标时，最近七天 count 对应的权重。
-     :weights (0.396 0.245 0.151 0.094 0.057 0.038 0.019)
-     ;; 获取前一天需要减去的天数。
-     :delta -1
-     ;; 计算日平均 count 需要乘的数字。
-     :factor 0.143))
-  "计算排序综合指数时，用到的基本信息。")
+     ;; 计算词条优先级时，连续七天的 day count 对应的权重。
+     :weights ,(pyim-proportion (reverse '(1 2 3 5 8 13 21)))
+     ;; 从当天日期获取前一天日期时，需要减去的天数，这个在 day count 类型中没有
+     ;; 意义，但如果以后添加 month count 类型，这个设置就有意义了。
+     :delta 1
+     ;; 计算 day count 对应的优先级数字时，需要乘的一个数，目的是让优先级列表中
+     ;; 的数字变成合适大小的整数。
+     :factor ,(/ 100.0 7)))
+  "通过 count 计算词条排序优先级时用到重要信息。
+
+在 pyim 中，优先级表示为数字列表， `pyim-dhashcache-count-types'
+每个 count type 对应一个数字。")
 
 (defvar pyim-dhashcache-code2word nil)
 (defvar pyim-dhashcache-code2word-md5 nil)
@@ -61,6 +67,7 @@
 (defvar pyim-dhashcache-iword2count-log nil)
 (defvar pyim-dhashcache-iword2count-recent1 nil)
 (defvar pyim-dhashcache-iword2count-recent2 nil)
+;; 注意事项： 在 pyim 中，优先级是多个数字组成的列表，而不是单个数字。
 (defvar pyim-dhashcache-iword2priority nil)
 (defvar pyim-dhashcache-shortcode2word nil)
 (defvar pyim-dhashcache-icode2word nil)
@@ -77,13 +84,16 @@
         (iword2priority pyim-dhashcache-iword2priority))
     (sort words-list
           (lambda (a b)
-            (let ((n1 (or (gethash a iword2priority) 0))
-                  (n2 (or (gethash b iword2priority) 0)))
-              (if (= n1 n2)
-                  (let ((n3 (or (gethash a iword2count) 0))
-                        (n4 (or (gethash b iword2count) 0)))
-                    (> n3 n4))
-                (> n1 n2)))))))
+            (let ((p1 (gethash a iword2priority))
+                  (p2 (gethash b iword2priority)))
+              (cond
+               ((and (listp p1)
+                     (listp p2)
+                     (not (equal p1 p2)))
+                (pyim-numbers> p1 p2))
+               (t (let ((n1 (or (gethash a iword2count) 0))
+                        (n2 (or (gethash b iword2count) 0)))
+                    (> n1 n2)))))))))
 
 (defun pyim-dhashcache-get-counts-from-log (log-info &optional time)
   "从 LOG-INFO 中获取所有的 count 值。
@@ -101,7 +111,7 @@
                    (time (or time (current-time)))
                    output)
               (dotimes (i n)
-                (let* ((time (time-add time (days-to-time (* i delta))))
+                (let* ((time (time-add time (days-to-time (* (- i) delta))))
                        (key (intern (format-time-string format time)))
                        (plist (cdr (assoc label log-info))))
                   (push (or (plist-get plist key) 0) output)))
@@ -109,23 +119,23 @@
           pyim-dhashcache-count-types))
 
 (defun pyim-dhashcache-calculate-priority (counts-info)
-  "根据 COUNTS-INFO 计算一个优先级指标，用于对词条进行排序。
-COUNTS-INFO 是一个 alist, 其结构类似：
+  "根据 COUNTS-INFO 计算优先级（优先级是多个数字组成的一个列表），
+用于对词条进行排序。COUNTS-INFO 是一个 alist, 其结构类似：
 
       ((day n1 n2 n3 ...))
 
 其中 (n1 n2 n3 ...) 代表从当前日期逐日倒推，每日 count 所组成的列表。"
-  (apply #'+ (mapcar (lambda (x)
-                       (let* ((label (car x))
-                              (plist (cdr x))
-                              (weights (plist-get plist :weights))
-                              (factor (plist-get plist :factor)))
-                         (* (apply #'+ (cl-mapcar (lambda (a b)
-                                                    (* (or a 0) b))
-                                                  (cdr (assoc label counts-info))
-                                                  weights))
-                            factor)))
-                     pyim-dhashcache-count-types)))
+  (mapcar (lambda (x)
+            (let* ((label (car x))
+                   (plist (cdr x))
+                   (weights (plist-get plist :weights))
+                   (factor (plist-get plist :factor)))
+              (round (* (apply #'+ (cl-mapcar (lambda (a b)
+                                                (* (or a 0) b))
+                                              (cdr (assoc label counts-info))
+                                              weights))
+                        factor))))
+          pyim-dhashcache-count-types))
 
 (defun pyim-dhashcache-get-shortcodes (code)
   "获取 CODE 所有的 shortcodes.

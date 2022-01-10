@@ -167,6 +167,22 @@ When CARE-FIRST-ONE is no-nil, ((a b c) (d e)) => (a d)."
 		            (funcall in (1- i) (1- j)))))))
       (funcall in l1 l2))))
 
+(defun pyim-proportion (nums)
+  "计算 NUMS 所占比例。"
+  (let ((sum (float (apply #'+ nums))))
+    (mapcar
+     (lambda (n)
+       (/ n sum))
+     nums)))
+
+(defun pyim-numbers> (a b)
+  "比较数字列表 A 和 B."
+  (if (and (car a) (car b)
+           (equal (car a) (car b)))
+      (pyim-numbers> (cdr a) (cdr b))
+    (> (or (car a) 0)
+       (or (car b) 0))))
+
 (defun pyim-add-unread-command-events (key &optional reset)
   "This function is a fork of `quail-add-unread-command-events'."
   (when reset

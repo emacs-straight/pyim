@@ -158,6 +158,22 @@
       t)
     (should (< (float-time (time-since time)) (* limit 2)))))
 
+(ert-deftest pyim-test-pyim-proportion ()
+  (should (equal (pyim-proportion '(1 2 3 4))
+                 '(0.1 0.2 0.3 0.4))))
+
+(ert-deftest pyim-test-pyim-numbers> ()
+  (should-not (pyim-numbers> '(1) '(3)))
+  (should (pyim-numbers> '(4) '(3)))
+  (should-not (pyim-numbers> '(1 2) '(3 4)))
+  (should-not (pyim-numbers> '(1 2) '(1 2)))
+  (should (pyim-numbers> '(2 2) '(1 1)))
+  (should (pyim-numbers> '(2 2) '(1 3)))
+  (should (pyim-numbers> '(2 2) '(1)))
+  (should-not (pyim-numbers> '(2 2) '(3)))
+  (should-not (pyim-numbers> '(2) '(3 1)))
+  (should (pyim-numbers> '(2) '(1 3))))
+
 ;; ** pyim-pymap 相关单元测试
 (ert-deftest pyim-tests-pyim-pymap ()
   (should-not (cl-find-if-not
@@ -882,7 +898,7 @@ yin-xing 因行
 (ert-deftest pyim-tests-pyim-dhashcache-calculate-priority ()
   (should (equal (pyim-dhashcache-calculate-priority
                   '((day 3 7 6 4 5 9 1)))
-                 0.690833)))
+                 '(69))))
 
 ;; ** pyim-dregcache 相关单元测试
 (ert-deftest pyim-tests-pyim-general ()
