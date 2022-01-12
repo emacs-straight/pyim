@@ -520,6 +520,11 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
     (if (not (eq (selected-window) (minibuffer-window)))
         (message string)
       (message nil)
+      ;; 在类似 vertico-posframe 这样的环境中，posframe window-point 同步问题不
+      ;; 太好处理，这里使用一个简单粗暴的方式：在输入过程中，隐藏真实的 cursor
+      ;; 并显示一个伪 cursor, 输入完成之后再恢复。
+      (setq-local cursor-type nil)
+
       ;; 异步获取词条的时候，上一次的 page 字符串可能还在 Minibuffer 中，所以首
       ;; 先要将其去除，否则会出现两个 page.
       (delete-char (length pyim-page-last-minibuffer-string))
@@ -527,6 +532,8 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
         (insert
          (setq pyim-page-last-minibuffer-string
                (concat
+                ;; 显示一个伪 cursor.
+                (propertize " " 'face 'cursor)
                 (or pyim-page-minibuffer-separator
                     (let* ((width (string-width (buffer-string)))
                            (n (- (* 20 (+ 1 (/ width 20))) width)))
@@ -559,7 +566,11 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
       (posframe-hide pyim-page-posframe-buffer))
      (t (when (eq (selected-window) (minibuffer-window))
           ;; 从 minibuffer 中删除 page 字符串。
-          (delete-char (length pyim-page-last-minibuffer-string)))
+          (delete-char (length pyim-page-last-minibuffer-string))
+          ;; 在类似 vertico-posframe 这样的环境中，posframe window-point 同步问题
+          ;; 不太好处理，这里使用一个简单粗暴的方式：在输入过程中，隐藏真实的
+          ;; cursor 并显示一个伪 cursor, 输入完成之后再恢复。
+          (setq-local cursor-type t))
         (setq pyim-page-last-minibuffer-string nil)))))
 
 ;; * Footer
