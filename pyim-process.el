@@ -34,10 +34,7 @@
 (require 'pyim-entered)
 (require 'pyim-imobjs)
 (require 'pyim-codes)
-(require 'pyim-page)
 (require 'pyim-candidates)
-(require 'pyim-preview)
-(require 'pyim-indicator)
 (require 'pyim-outcome)
 (require 'pyim-punctuation)
 (require 'pyim-autoselector)
@@ -116,23 +113,14 @@
   (pyim-dcache-call-api 'update-personal-words t))
 
 (defun pyim-process-init-ui ()
-  "PYIM 流程，用户界面相关的初始化工作。"
-  (pyim-preview-setup-overlay))
+  "PYIM 流程，用户界面相关的初始化工作。")
 
 (defun pyim-process-start-daemon ()
-  "启动 pyim 流程需要的相关 daemon."
-  (pyim-indicator-start-daemon #'pyim-process-indicator-function))
+  "启动 pyim 流程需要的相关 daemon, 接口函数.")
 
 (defun pyim-process-stop-daemon ()
-  "关闭 pyim 流程已经启动的 daemon."
-  (interactive)
-  ;; 只有其它的 buffer 中没有启动 pyim 时，才停止 daemon.
-  ;; 因为 daemon 是服务所有 buffer 的。
-  (unless (cl-find-if
-           (lambda (buf)
-             (buffer-local-value 'current-input-method buf))
-           (remove (current-buffer) (buffer-list)))
-    (pyim-indicator-stop-daemon)))
+  "关闭 pyim 流程已经启动的 daemon, 接口函数."
+  (interactive))
 
 (defmacro pyim-process-with-entered-buffer (&rest forms)
   "PYIM 流程的输入保存在一个 buffer 中，使用 FORMS 处理这个 buffer
@@ -309,8 +297,14 @@
          (pyim-entered-get 'point-after))
         (pyim-process-terminate))
        (t (setq pyim-candidate-position 1)
-          (pyim-preview-refresh)
-          (pyim-page-refresh))))))
+          (pyim-process-preview-refresh)
+          (pyim-process-page-refresh))))))
+
+(defun pyim-process-preview-refresh ()
+  "Preview refresh 接口函数。")
+
+(defun pyim-process-page-refresh ()
+  "Page refresh 接口函数。")
 
 (defun pyim-process-self-insert-command-p (cmd)
   "测试 CMD 是否是一个 pyim self insert command."
@@ -322,8 +316,8 @@
          (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
     (when words
       (setq pyim-candidates words)
-      (pyim-preview-refresh)
-      (pyim-page-refresh))))
+      (pyim-process-preview-refresh)
+      (pyim-process-page-refresh))))
 
 (defun pyim-process-run-async-timer-reset ()
   "Reset `pyim-process-run-async-timer'."
@@ -610,14 +604,20 @@ BUG：拼音无法有效地处理多音字。"
   (setq pyim-process-force-input-chinese nil)
   (setq pyim-candidates nil)
   (setq pyim-candidates-last nil)
-  (pyim-preview-delete-string)
-  (pyim-page-hide)
+  (pyim-process-preview-hide)
+  (pyim-process-page-hide)
   (setq pyim-cstring-to-code-criteria nil)
   (pyim-process-run-async-timer-reset)
   (let* ((class (pyim-scheme-get-option (pyim-scheme-name) :class))
          (func (intern (format "pyim-process-terminate:%S" class))))
     (when (and class (functionp func))
       (funcall func))))
+
+(defun pyim-process-preview-hide ()
+  "Preview hide 接口函数.")
+
+(defun pyim-process-page-hide ()
+  "Page hide 接口函数.")
 
 ;; * Footer
 (provide 'pyim-process)
