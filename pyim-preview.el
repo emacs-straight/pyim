@@ -29,7 +29,6 @@
 ;; * 代码                                                           :code:
 (require 'cl-lib)
 (require 'pyim-common)
-(require 'pyim-outcome)
 (require 'pyim-process)
 
 (defgroup pyim-preview nil
@@ -75,21 +74,21 @@ pyim 会使用 Emacs overlay 机制在 *待输入buffer* 光标处高亮显示�
 个预览字符串，让用户可以查看将要输入的字符串，这个函数用于更新这
 个字符串的内容。"
   (let* ((class (pyim-scheme-get-option (pyim-scheme-name) :class))
-         (candidates pyim-candidates)
-         (pos (1- (min pyim-candidate-position (length candidates))))
-         (preview (concat (pyim-outcome-get)
+         (candidates (pyim-process-get-candidates))
+         (pos (1- (min (pyim-process-get-candidate-position)
+                       (length candidates))))
+         (preview (concat (pyim-process-get-outcome)
                           (nth pos candidates))))
     (when (memq class '(quanpin))
       (let ((rest (mapconcat
                    (lambda (py)
                      (concat (nth 0 py) (nth 1 py)))
-                   (nthcdr (length preview) (car pyim-imobjs))
+                   (nthcdr (length preview)
+                           (pyim-process-get-first-imobj))
                    "'")))
         (when (string< "" rest)
           (setq preview (concat preview rest)))))
-    (setq preview
-          (pyim-outcome-magic-convert
-           (pyim-outcome-get-subword preview)))
+    (setq preview (pyim-process-subword-and-magic-convert preview))
     ;; Delete old preview string.
     (pyim-preview-delete-string)
     ;; Insert new preview string.
@@ -111,6 +110,8 @@ pyim 会使用 Emacs overlay 机制在 *待输入buffer* 光标处高亮显示�
 (defun pyim-preview-start-point ()
   "Preview 字符串的开始位置。"
   (overlay-start pyim-preview-overlay))
+
+(advice-add 'pyim-process-ui-position :override #'pyim-preview-start-point)
 
 ;; * Footer
 (provide 'pyim-preview)

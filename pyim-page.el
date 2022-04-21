@@ -33,7 +33,6 @@
 ;; popup 不是 GNU ELPA 包，所以 pyim 不能强制依赖它。
 (require 'popup nil t)
 (require 'pyim-common)
-(require 'pyim-preview)
 (require 'pyim-process)
 
 (defgroup pyim-page nil
@@ -139,12 +138,13 @@ Only useful when use posframe.")
 细节信息请参考 `pyim-page-refresh' 的 docstring."
   (1+ (/ (1- (pyim-process-candidates-length)) pyim-page-length)))
 
-(defun pyim-page-start ()
+(defun pyim-page-start (&optional candidate-position)
   "计算当前所在页的第一个词条的位置.
 
 细节信息请参考 `pyim-page-refresh' 的 docstring."
   (let ((pos (min (pyim-process-candidates-length)
-                  (pyim-process-get-candidate-position))))
+                  (or candidate-position
+                      (pyim-process-get-candidate-position)))))
     (1+ (* (/ (1- pos) pyim-page-length) pyim-page-length))))
 
 (defun pyim-page-end ()
@@ -230,7 +230,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
                (null unread-post-input-method-events))
       (pyim-page-show
        (pyim-page-info-format page-info tooltip)
-       (pyim-preview-start-point)
+       (pyim-process-ui-position)
        tooltip))))
 
 (advice-add 'pyim-process-page-refresh :after #'pyim-page-refresh)
@@ -246,14 +246,11 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
                    (* pyim-page-length arg) 1))
            (maxpos (+ 1 (pyim-process-candidates-length))))
       (pyim-process-set-candidate-position
-       (if (> new 0)
-           (if (> new maxpos) 1 new)
-         maxpos))
-      ;; The return value of pyim-page-start will change when candidate position
-      ;; is change.
-      (pyim-process-set-candidate-position
-       (pyim-page-start))
-      (pyim-preview-refresh)
+       (pyim-page-start
+        (if (> new 0)
+            (if (> new maxpos) 1 new)
+          maxpos)))
+      (pyim-process-preview-refresh)
       (pyim-page-refresh))))
 
 (defun pyim-page-previous-page (arg)
@@ -272,7 +269,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
        (if (>= len new)
            (if (> new 0) new len)
          1))
-      (pyim-preview-refresh)
+      (pyim-process-preview-refresh)
       (pyim-page-refresh t))))
 
 (defun pyim-page-previous-word (arg)
@@ -293,7 +290,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
   (let* ((separator (or separator " "))
          (translated (string-join (mapcar (lambda (w)
                                             (concat (nth 0 w) (nth 1 w)))
-                                          (car (pyim-process-get-imobjs)))
+                                          (pyim-process-get-first-imobj))
                                   separator)))
     (concat
      ;; | 显示光标位置的字符
@@ -316,7 +313,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
 (defun pyim-page-preview-create:shuangpin (&optional separator)
   (let ((keymaps (pyim-scheme-get-option (pyim-scheme-name) :keymaps))
         result)
-    (dolist (w (car (pyim-process-get-imobjs)))
+    (dolist (w (pyim-process-get-first-imobj))
       (let ((sm (nth 0 w))
             (ym (nth 1 w)))
         (if (equal sm "")

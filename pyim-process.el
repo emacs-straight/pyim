@@ -115,6 +115,9 @@
 (defun pyim-process-init-ui ()
   "PYIM 流程，用户界面相关的初始化工作。")
 
+(defun pyim-process-ui-position ()
+  "用户界面定位点获取函数接口.")
+
 (defun pyim-process-start-daemon ()
   "启动 pyim 流程需要的相关 daemon, 接口函数.")
 
@@ -337,8 +340,8 @@
 (defun pyim-process-set-candidate-position (n)
   (setq pyim-candidate-position n))
 
-(defun pyim-process-get-imobjs ()
-  pyim-imobjs)
+(defun pyim-process-get-first-imobj ()
+  (car pyim-imobjs))
 
 (defun pyim-process-select-subword-p ()
   pyim-outcome-subword-info)
@@ -361,6 +364,11 @@
     (when magic-convert
       (setq str (pyim-outcome-magic-convert str)))
     str))
+
+(defun pyim-process-subword-and-magic-convert (string)
+  "返回 STRING 以词定字和魔术转换后的新字符串."
+  (pyim-outcome-magic-convert
+   (pyim-outcome-get-subword string)))
 
 (defun pyim-process-outcome-handle (type)
   "依照 TYPE, 获取 pyim 的 outcome，并将其加入 `pyim-outcome-history'."
@@ -535,7 +543,7 @@ alist 列表。"
   "创建 `pyim-cstring-to-code-criteria'."
   (setq pyim-cstring-to-code-criteria
         (let ((str (string-join
-                    (pyim-codes-create (car (pyim-process-get-imobjs))
+                    (pyim-codes-create (pyim-process-get-first-imobj)
                                        (pyim-scheme-name)))))
           (if (> (length pyim-cstring-to-code-criteria)
                  (length str))
