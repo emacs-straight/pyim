@@ -7,7 +7,7 @@
 ;;         Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
 ;; URL: https://github.com/tumashu/pyim
-;; Version: 4.1.1
+;; Version: 4.2.0
 ;; Keywords: convenience, Chinese, pinyin, input-method
 ;; Package-Requires: ((emacs "25.1") (async "1.6") (xr "1.13"))
 
@@ -41,6 +41,7 @@
 (require 'pyim-preview)
 (require 'pyim-indicator)
 (require 'pyim-process)
+(require 'pyim-autoselector)
 (require 'pyim-cstring)
 (require 'pyim-dict)
 
