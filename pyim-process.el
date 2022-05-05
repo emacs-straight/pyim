@@ -128,9 +128,19 @@ entered (nihaom) 的第一个候选词。
 (defvar pyim-process-ui-position-function #'point
   "The value is a function returned a position where ui place.")
 
+(defvar pyim-process-start-daemon-hook nil
+  "Pyim start daemon hook.")
+
+(defvar pyim-process-stop-daemon-hook nil
+  "Pyim stop daemon hook.")
+
 (pyim-register-local-variables
  '(pyim-process-input-ascii
    pyim-process-translating))
+
+(defun pyim-process-ui-init ()
+  "初始化 pyim 相关 UI."
+  (run-hooks 'pyim-process-ui-init-hook))
 
 (defun pyim-process-init-dcaches (&optional force)
   "PYIM 流程，词库相关的初始化工作。"
@@ -147,11 +157,13 @@ entered (nihaom) 的第一个候选词。
   (pyim-dcache-call-api 'update-personal-words t))
 
 (defun pyim-process-start-daemon ()
-  "启动 pyim 流程需要的相关 daemon, 接口函数.")
+  "启动 pyim 流程需要的 daemon."
+  (run-hooks 'pyim-process-start-daemon-hook))
 
 (defun pyim-process-stop-daemon ()
-  "关闭 pyim 流程已经启动的 daemon, 接口函数."
-  (interactive))
+  "关闭 pyim 流程已经启动的 daemon."
+  (interactive)
+  (run-hooks 'pyim-process-stop-daemon-hook))
 
 (defmacro pyim-process-with-entered-buffer (&rest forms)
   "PYIM 流程的输入保存在一个 buffer 中，使用 FORMS 处理这个 buffer
@@ -328,7 +340,11 @@ entered (nihaom) 的第一个候选词。
          (pyim-entered-get 'point-after))
         (pyim-process-terminate))
        (t (setq pyim-candidate-position 1)
-          (run-hooks 'pyim-process-ui-refresh-hook))))))
+          (pyim-process-ui-refresh))))))
+
+(defun pyim-process-ui-refresh (&optional hightlight-current)
+  "刷新 pyim 相关 UI."
+  (run-hook-with-args 'pyim-process-ui-refresh-hook hightlight-current))
 
 (defun pyim-process-self-insert-command-p (cmd)
   "测试 CMD 是否是一个 pyim self insert command."
@@ -340,7 +356,7 @@ entered (nihaom) 的第一个候选词。
          (words (delete-dups (pyim-candidates-create pyim-imobjs scheme-name t))))
     (when words
       (setq pyim-candidates words)
-      (run-hooks 'pyim-process-ui-refresh-hook))))
+      (pyim-process-ui-refresh))))
 
 (defun pyim-process-run-async-timer-reset ()
   "Reset `pyim-process-run-async-timer'."
@@ -644,14 +660,17 @@ BUG：拼音无法有效地处理多音字。"
   (setq pyim-process-force-input-chinese nil)
   (setq pyim-candidates nil)
   (setq pyim-candidates-last nil)
-  (run-hooks 'pyim-process-ui-hide-hook)
   (setq pyim-cstring-to-code-criteria nil)
   (pyim-process-run-async-timer-reset)
+  (pyim-process-ui-hide)
   (let* ((class (pyim-scheme-get-option (pyim-scheme-name) :class))
          (func (intern (format "pyim-process-terminate:%S" class))))
     (when (and class (functionp func))
       (funcall func))))
 
+(defun pyim-process-ui-hide ()
+  "隐藏 pyim 相关 UI."
+  (run-hooks 'pyim-process-ui-hide-hook))
 
 ;; * Footer
 (provide 'pyim-process)
