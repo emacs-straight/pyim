@@ -60,7 +60,8 @@
                    t nil 0.2)))
       (when (bufferp buffer)
         (with-current-buffer buffer
-          (pyim-cloudim-parse-baidu-buffer))))))
+          (prog1 (pyim-cloudim-parse-baidu-buffer)
+            (kill-buffer)))))))
 
 (defun pyim-cloudim-url-retrieve-sync (url &optional silent inhibit-cookies timeout)
   "Pyim 版本的 `url-retrieve-synchronously'.
@@ -131,7 +132,7 @@
                 (buffer-string)
                 'utf-8))))
     (when (> (length word) 0)
-      (list word))))
+      (list (propertize word :comment "(云)")))))
 
 (defun pyim-cloudim:google (string scheme-name)
   "使用 google 云输入法引擎搜索 STRING, 获取词条列表。"
