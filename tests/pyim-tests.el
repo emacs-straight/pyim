@@ -397,7 +397,9 @@
   (with-temp-buffer
     (insert "你好你好你坏你坏你话牛蛤牛和牛蛤牛蛤牛蛤牛蛤牛蛤")
     (should (equal (pyim-candidates-search-buffer (pyim-cregexp-build "nh" 3 t))
-                   '("牛蛤" "你坏" "你好" "牛和" "你话")))))
+                   '("牛蛤" "你坏" "你好" "牛和" "你话")))
+    (let ((words (pyim-candidates-search-buffer (pyim-cregexp-build "nh" 3 t))))
+      (should (equal (get-text-property 0 :comment (car words)) "(Buf)")))))
 
 (ert-deftest pyim-tests-pyim-candidates-cloud-search ()
   (let ((pyim-candidates-cloud-search-function
@@ -946,7 +948,8 @@ Content-Type: text/plain; charset=utf-8
 Date: Sun, 08 May 2022 00:56:13 GMT
 
 {\"0\":[[[\"你好\",5,{\"pinyin\":\"ni'hao\",\"type\":\"IMEDICT\"}]]],\"1\":\"ni'hao\",\"result\":[null]}")
-    (should (equal (pyim-cloudim-parse-baidu-buffer) '("你好"))))
+    (should (equal (pyim-cloudim-parse-baidu-buffer) '("你好")))
+    (should (equal (get-text-property 0 :comment (car (pyim-cloudim-parse-baidu-buffer))) "(云)")))
 
   (with-temp-buffer
     (insert "HTTP/1.1 200 OK
@@ -965,7 +968,8 @@ Alt-Svc: h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000,h3-Q050=\":443\"; ma
 Transfer-Encoding: chunked
 
 [\"SUCCESS\",[[\"nihao\",[\"你好\"],[],{\"annotation\":[\"ni hao\"],\"candidate_type\":[0],\"lc\":[\"16 16\"]}]]]")
-    (should (equal (pyim-cloudim-parse-google-buffer) '("你好"))))
+    (should (equal (pyim-cloudim-parse-google-buffer) '("你好")))
+    (should (equal (get-text-property 0 :comment (car (pyim-cloudim-parse-google-buffer))) "(云)")))
 
   (when (not noninteractive)
     (should (equal (pyim-cloudim:baidu "nihao" 'quanpin) '("你好")))
