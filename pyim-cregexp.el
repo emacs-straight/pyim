@@ -28,9 +28,12 @@
 ;;; Code:
 ;; * 代码                                                           :code:
 (require 'cl-lib)
+(require 'pyim-dcache)
+(require 'pyim-imobjs)
 (require 'pyim-pymap)
-(require 'xr)
+(require 'pyim-scheme)
 (require 'rx)
+(require 'xr)
 
 (defgroup pyim-cregexp nil
   "Chinese regexp tools for pyim."
@@ -42,6 +45,14 @@
 如果 `pyim-cregexp-build' 无法支持用户正在使用的 scheme 时，
 将使用这个 scheme."
   :type 'symbol)
+
+(defcustom pyim-cregexp-convert-at-point-function
+  #'pyim-cregexp-convert-at-point-function
+  "`pyim-cregexp-convert-at-point' 使用的函数。
+
+此函数有一个参数 cregexp, 表示生成的 cregexp. 其返回值会插入当前
+buffer."
+  :type 'function)
 
 (defun pyim-cregexp-char-level-num (num)
   "根据 NUM 返回一个有效的常用汉字级别。"
@@ -218,11 +229,8 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
 在 minibuffer 中，这个命令默认会自动运行 `exit-minibuffer'.
 这个可以使用 INSERT-ONLY 参数控制。"
   (interactive "P")
-  (unless (equal input-method-function 'pyim-input-method)
-    (activate-input-method 'pyim))
-  (let* ((buffer-string
-          (buffer-substring (point-min) (point-max)))
-         (string (if mark-active
+  (pyim-pymap-cache-create)
+  (let* ((string (if mark-active
                      (buffer-substring-no-properties
                       (region-beginning) (region-end))
                    (buffer-substring
@@ -233,56 +241,21 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
          (length (length string))
          (cregexp (pyim-cregexp-build string)))
     (delete-char (- 0 length))
-    (cond
-     ;; Deal with `org-search-view'
-     ((and (window-minibuffer-p)
-           (string-match-p
-            (regexp-quote "[+-]Word/{Regexp}") buffer-string))
-      (insert (format "{%s}" cregexp)))
-     (t (insert cregexp)))
+    (insert (funcall pyim-cregexp-convert-at-point-function cregexp))
     (when (and (not insert-only)
                (window-minibuffer-p))
       (exit-minibuffer))))
 
-(defun pyim-cregexp-isearch-search-fun ()
-  "这个函数为 isearch 相关命令添加中文拼音搜索功能，
-做为 `isearch-search-fun' 函数的 advice 使用。"
-  (funcall
-   (lambda ()
-     `(lambda (string &optional bound noerror count)
-        (funcall (if ,isearch-forward
-                     're-search-forward
-                   're-search-backward)
-                 (pyim-cregexp-build string) bound noerror count)))))
-
-;;;###autoload
-(define-minor-mode pyim-isearch-mode
-  "这个 mode 为 isearch 添加拼音搜索功能."
-  :global t
-  :require 'pyim
-  :lighter " pyim-isearch"
-  (if pyim-isearch-mode
-      (progn
-        (advice-add 'isearch-search-fun :override #'pyim-cregexp-isearch-search-fun)
-        (message "PYIM: `pyim-isearch-mode' 已经激活，激活后，一些 isearch 扩展包有可能失效。"))
-    (advice-remove 'isearch-search-fun #'pyim-cregexp-isearch-search-fun)))
-
-(declare-function ivy--regex-plus "ivy")
-
-(defun pyim-cregexp-ivy (str)
-  "Let ivy support search Chinese with pinyin feature."
-  (let ((x (ivy--regex-plus str))
-        (case-fold-search nil))
-    (if (listp x)
-        (mapcar (lambda (y)
-                  (if (cdr y)
-                      (list (if (equal (car y) "")
-                                ""
-                              (pyim-cregexp-build (car y)))
-                            (cdr y))
-                    (list (pyim-cregexp-build (car y)))))
-                x)
-      (pyim-cregexp-build x))))
+(defun pyim-cregexp-convert-at-point-function (cregexp)
+  "这个函数是变量 `pyim-cregexp-convert-at-point-function' 的默认取值。"
+  (cond
+   ;; Deal with `org-search-view'
+   ((and (window-minibuffer-p)
+         (string-match-p
+          (regexp-quote "[+-]Word/{Regexp}")
+          (buffer-substring (point-min) (point-max))))
+    (format "{%s}" cregexp))
+   (t cregexp)))
 
 ;; * Footer
 (provide 'pyim-cregexp)
