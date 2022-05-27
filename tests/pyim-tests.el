@@ -559,7 +559,29 @@
       ;; 天安门<I>
       (goto-char (point-max))
       (should (equal (pyim-cstring-words-at-point)
-                     '(("天安门" 3 0) ("安门" 2 0)))))))
+                     '(("天安门" 3 0) ("安门" 2 0))))
+
+      ;; <I>天安门abc
+      (goto-char (point-min))
+      (should (equal (pyim-cstring-words-at-point t) nil)))))
+
+(ert-deftest pyim-tests-pyim-cstring-forward-or-backward-word ()
+  (with-temp-buffer
+    (let ((pyim-dhashcache-code2word (make-hash-table :test #'equal)))
+      (puthash "ha-ha" (list "哈哈") pyim-dhashcache-code2word)
+      (puthash "wo-ai" (list "我爱") pyim-dhashcache-code2word)
+      (puthash "bei-jing" (list "北京") pyim-dhashcache-code2word)
+      (puthash "tian-an-men" (list "天安门") pyim-dhashcache-code2word)
+      (insert "哈哈我爱北京天安门")
+      (goto-char 2)
+      (pyim-cstring-forward-word 1)
+      (should (equal (buffer-substring (point-min) (point)) "哈哈"))
+      (pyim-cstring-forward-word 3)
+      (should (equal (buffer-substring (point-min) (point)) "哈哈我爱北京天安门"))
+      (pyim-cstring-backward-word 1)
+      (should (equal (buffer-substring (point-min) (point)) "哈哈我爱北京"))
+      (pyim-cstring-backward-word 2)
+      (should (equal (buffer-substring (point-min) (point)) "哈哈")))))
 
 ;; ** pyim-cregexp 相关单元测试
 (ert-deftest pyim-tests-pyim-cregexp ()
