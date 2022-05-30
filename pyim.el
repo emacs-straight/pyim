@@ -37,9 +37,6 @@
 (require 'pyim-autoselector)
 (require 'pyim-common)
 (require 'pyim-cstring)
-;; NOTE: pyim.el 不依赖这个包, 但由于历史原因，许多 elpa 词库包通过 pyim 来得到
-;; dict 相关的操作函数，所以暂时需要保留。
-(require 'pyim-dict)
 (require 'pyim-indicator)
 (require 'pyim-page)
 (require 'pyim-preview)
@@ -839,14 +836,6 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 
 ;; ** pyim 云输入法
 (require 'pyim-cloudim)
-
-;; ** pyim 中文字符串工具
-;; FIXME: pyim 相关功能不依赖这个包，require 是由于向后兼容的原因，未来会删除。
-(require 'pyim-cstring-utils)
-
-;; ** pyim 中文 regexp 工具
-;; FIXME: pyim 相关功能不依赖这个包，require 是由于向后兼容的原因，未来会删除。
-(require 'pyim-cregexp-utils)
 
 ;; * Footer
 (provide 'pyim)
