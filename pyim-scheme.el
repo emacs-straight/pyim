@@ -63,7 +63,8 @@
   first-chars
   rest-chars
   code-prefix
-  prefer-triggers)
+  prefer-triggers
+  cregexp-support-p)
 
 (cl-defstruct (pyim-scheme-quanpin
                (:include pyim-scheme)
@@ -151,14 +152,18 @@
        (equal (pyim-scheme-name x) scheme-name))
      pyim-schemes)))
 
+;; 注意：这个 quanpin scheme 在 pyim 中有特殊的作用，许多功能都依赖 quanpin
+;; scheme 的存在，所以这个 scheme 不可以删除，也不可以更改名字。
 (pyim-scheme-add
  '(quanpin
    :document "全拼输入法方案（不可删除）。"
    :class quanpin
    :first-chars "abcdefghijklmnopqrstuwxyz"
    :rest-chars "vmpfwckzyjqdltxuognbhsrei'-a"
-   :prefer-triggers ("v")))
+   :prefer-triggers ("v")
+   :cregexp-support-p t))
 
+;; 注意：许多测试依赖这个 scheme, 所以更改名称或者删除会导致这些测试失败。
 (pyim-scheme-add
  '(wubi
    :document "五笔输入法。"
@@ -169,8 +174,10 @@
    :code-prefix-history (".") ;五笔词库以前使用 "." 做为 code-prefix.
    :code-split-length 4 ;默认将用户输入切成 4 个字符长的 code 列表（不计算 code-prefix）
    :code-maximum-length 4 ;五笔词库中，code 的最大长度（不计算 code-prefix）
-   :prefer-triggers nil))
+   :prefer-triggers nil
+   :cregexp-support-p t))
 
+;; 注意：一些测试依赖这个 scheme, 所以更改名称或者删除会导致这些测试失败。
 (pyim-scheme-add
  '(cangjie
    :document "倉頡输入法。"
@@ -181,7 +188,8 @@
    :code-prefix-history ("@") ;仓颉输入法词库曾经使用过的 code-prefix
    :code-split-length 5 ;默认将用户输入切成 5 个字符长的 code 列表（不计算 code-prefix）
    :code-maximum-length 5 ;仓颉词库中，code 的最大长度（不计算 code-prefix）
-   :prefer-triggers nil))
+   :prefer-triggers nil
+   :cregexp-support-p t))
 
 (pyim-scheme-add
  '(pyim-shuangpin
@@ -190,6 +198,7 @@
    :first-chars "abcdefghijklmnpqrstuvwxyz"
    :rest-chars "abcdefghijklmnopqrstuvwxyz"
    :prefer-triggers ("o")
+   :cregexp-support-p t
    :keymaps
    (("a" "a" "a")
     ("b" "b" "in")
@@ -238,6 +247,7 @@
    :first-chars "abcdefghijklmnopqrstuvwxyz"
    :rest-chars "abcdefghijklmnopqrstuvwxyz;"
    :prefer-triggers nil
+   :cregexp-support-p t
    :keymaps
    (("a" "a" "a")
     ("b" "b" "ou")
@@ -286,6 +296,7 @@
    :first-chars "abcdefghjklmnopqrstvwxyz"
    :rest-chars "abcdefghijklmnopqrstuvwxyz"
    :prefer-triggers nil
+   :cregexp-support-p t
    :keymaps
    (("q" "q" "ei")
     ("w" "w" "ian")
@@ -333,6 +344,7 @@
    :first-chars "abcdefghijklmnopqrstuvwxyz"
    :rest-chars "abcdefghijklmnopqrstuvwxyz"
    :prefer-triggers nil
+   :cregexp-support-p t
    :keymaps
    (("a" "a" "a")
     ("b" "b" "in")

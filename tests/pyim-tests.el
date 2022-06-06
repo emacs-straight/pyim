@@ -827,6 +827,12 @@
 
 ;; ** pyim-cregexp 相关单元测试
 (ert-deftest pyim-tests-pyim-cregexp ()
+  (let ((wubi (pyim-scheme-get 'wubi))
+        (pyim-default-scheme 'quanpin)
+        (pyim-cregexp-fallback-scheme 'wubi))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme)) 'quanpin))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme wubi)) 'wubi)))
+
   (let ((regexp (pyim-cregexp-build "nihao")))
     (should (string-match-p regexp "nihao"))
     (should (string-match-p regexp "anihaob"))
@@ -866,20 +872,23 @@
     (should (string-match-p regexp "牛蛤")))
 
   (let* ((str (nth 2 (split-string (car (pyim-pymap-py2cchar-get "wang" t)) "|")))
-         (regexp1 (pyim-cregexp-build-1 "wang" 3))
-         (regexp2 (pyim-cregexp-build-1 "wang" 2)))
+         (quanpin (pyim-scheme-get 'quanpin))
+         (regexp1 (pyim-cregexp-create-1 "wang" quanpin 3 nil))
+         (regexp2 (pyim-cregexp-create-1 "wang" quanpin 2)))
     (should (string-match-p regexp1 str))
     (should-not (string-match-p regexp2 str)))
 
-  (let* ((imobj '(("d" "a" "d" "a") ("w" "ang" "w" "ang")))
-         (regexp1 (pyim-cregexp-build-quanpin imobj))
-         (regexp2 (pyim-cregexp-build-quanpin imobj nil nil t)))
+  (let* ((quanpin (pyim-scheme-get 'quanpin))
+         (imobj '(("d" "a" "d" "a") ("w" "ang" "w" "ang")))
+         (regexp1 (pyim-cregexp-create-from-imobj imobj quanpin))
+         (regexp2 (pyim-cregexp-create-from-imobj imobj quanpin nil nil t)))
     (should (string-match-p regexp1 "大王"))
     (should (string-match-p regexp1 "当王"))
     (should (string-match-p regexp2 "大王"))
     (should-not (string-match-p regexp2 "当王")))
 
   (let ((pyim-default-scheme 'wubi)
+        (wubi (pyim-scheme-get 'wubi))
         (pyim-dhashcache-code2word (make-hash-table :test #'equal)))
     (puthash "wubi/aaaa" (list "工" "恭恭敬敬") pyim-dhashcache-code2word)
     (puthash "wubi/adww" (list "欺" "蒙古人" "其人" "欺人" "斯人" "惹人" "匧" "歁" "莢") pyim-dhashcache-code2word)
@@ -887,7 +896,7 @@
     (should (equal (pyim-cregexp-build "adww") "\\(?:adww\\|[其匧惹斯欺歁莢蒙][人古]?人?\\)"))
     (should (equal (pyim-cregexp-build "aaaa'aaaa")
                    "\\(?:\\(?:aaaa'\\|aaaa\\|[工恭]恭?敬?敬?\\)\\(?:aaaa\\|[工恭]恭?敬?敬?\\)\\)"))
-    (should (equal (pyim-cregexp-build-1 "aaaa'aaaa")
+    (should (equal (pyim-cregexp-create-1 "aaaa'aaaa" wubi)
                    "\\(?:aaaa'\\|aaaa\\|[工恭][恭]?[敬]?[敬]?\\)\\(?:aaaa\\|[工恭][恭]?[敬]?[敬]?\\)")))
 
   (with-temp-buffer
@@ -1500,14 +1509,14 @@ Transfer-Encoding: chunked
                    'test))))
 
 (ert-deftest pyim-tests-pyim-page-info-format ()
-  (let ((page-info (make-hash-table)))
-    (puthash :scheme (pyim-scheme-get 'quanpin) page-info)
-    (puthash :current-page 1 page-info)
-    (puthash :total-page 26 page-info)
-    (puthash :candidates '("你好" "尼耗" "您耗" "您好" "你") page-info)
-    (puthash :position 3 page-info)
-    (puthash :hightlight-current 'hightlight-current page-info)
-    (puthash :assistant-enable nil page-info)
+  (let ((page-info
+         (list :scheme (pyim-scheme-get 'quanpin)
+               :current-page 1
+               :total-page 26
+               :candidates '("你好" "尼耗" "您耗" "您好" "你")
+               :position 3
+               :hightlight-current 'hightlight-current
+               :assistant-enable nil)))
 
     (should (equal (pyim-page-info-format 'two-lines page-info)
                    "=> | [1/26]: 
