@@ -43,20 +43,6 @@
   "启用输入联想词功能."
   :type 'boolean)
 
-(defvar pyim-candidates nil
-  "所有备选词条组成的列表.")
-
-(defvar pyim-candidates-last nil
-  "上一轮备选词条列表，这个变量主要用于 autoselector 机制.")
-
-(defvar pyim-candidate-position nil
-  "当前选择的词条在 `pyim-candidates’ 中的位置.
-
-细节信息请参考 `pyim-page-refresh' 的 docstring.")
-
-(pyim-register-local-variables
- '(pyim-candidates pyim-candidate-position))
-
 ;; ** 获取备选词列表
 (defun pyim-candidates-sort (candidates)
   "对 CANDIDATES 进行排序。"
@@ -281,28 +267,23 @@
     (cl-subseq chars 0 num)))
 
 (cl-defgeneric pyim-candidates-create-limit-time (imobjs scheme orig-candidates)
-  "按照 SCHEME, 使用延迟的方式从 IMOBJS 获得候选词条。
+  "按照 SCHEME, 使用限时运行的方式从 IMOBJS 获得候选词条。
 
 1. 这个函数是同步运行。
 2. 这个函数运行有时间限制，运行超过某个时间后，无论有没有结果，必须结束。
 3. 这个函数需要探测用户是否输入，如果用户开始输入，这个函数运行必须结束。")
 
-(cl-defmethod pyim-candidates-create-limit-time (_imobjs _scheme orig-candidates)
-  "按照 SCHEME, 使用延迟的方式从 IMOBJS 获得候选词条。"
-  orig-candidates)
+(cl-defmethod pyim-candidates-create-limit-time (_imobjs _scheme)
+  "按照 SCHEME, 使用限时运行的方式从 IMOBJS 获得候选词条。")
 
-(cl-defmethod pyim-candidates-create-limit-time (imobjs (scheme pyim-scheme-quanpin) orig-candidates)
-  "按照 SCHEME, 用延迟的方式从 IMOBJS 获得候选词条，用于全拼输入法。"
+(cl-defmethod pyim-candidates-create-limit-time (imobjs (scheme pyim-scheme-quanpin))
+  "按照 SCHEME, 用限时运行的方式从 IMOBJS 获得候选词条，用于全拼输入法。"
   ;; 构建一个搜索中文的正则表达式, 然后使用这个正则表达式在当前 buffer 中搜
   ;; 索词条。
   (let ((str (string-join (pyim-codes-create (car imobjs) scheme))))
-    (if (< (length str) 1)
-        orig-candidates
-      ;; NOTE: 让第一个词保持不变是不是合理，有待进一步的观察。
-      `(,(car orig-candidates)
-        ,@(pyim-candidates-search-buffer
-           (pyim-cregexp-create str scheme 3 t))
-        ,@(cdr orig-candidates)))))
+    (when (> (length str) 0)
+      (pyim-candidates-search-buffer
+       (pyim-cregexp-create str scheme 3 t)))))
 
 (defun pyim-candidates-search-buffer (regexp)
   "在当前 buffer 中使用 REGEXP 搜索词条。"
@@ -326,11 +307,11 @@
                       (> (or (gethash a counts) 0)
                          (or (gethash b counts) 0))))))))
 
-(cl-defmethod pyim-candidates-create-limit-time (imobjs (_scheme pyim-scheme-shuangpin) orig-candidates)
-  "按照 SCHEME, 用延迟的方式从 IMOBJS 获得候选词条，用于双拼输入法。"
+(cl-defmethod pyim-candidates-create-limit-time (imobjs (_scheme pyim-scheme-shuangpin))
+  "按照 SCHEME, 用限时运行的方式从 IMOBJS 获得候选词条，用于双拼输入法。"
   ;; 注意：pyim 支持的双拼输入法，内部使用全拼的 imobjs, 所以这里直接调用全拼的
   ;; `pyim-candidates-create-limit-time' 方法来处理 imobjs。
-  (cl-call-next-method imobjs (pyim-scheme-get 'quanpin) orig-candidates))
+  (cl-call-next-method imobjs (pyim-scheme-get 'quanpin)))
 
 (cl-defgeneric pyim-candidates-create-async (imobjs scheme callback)
   "按照 SCHEME, 使用异步的方式从 IMOBJS 获得候选词条。

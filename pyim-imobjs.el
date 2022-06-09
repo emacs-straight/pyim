@@ -36,51 +36,6 @@
   "Imobjs lib for pyim."
   :group 'pyim)
 
-(defvar pyim-imobjs nil
-  "Imobj (Input method object) 组成的 list.
-
-imobj 在 pyim 里面的概念，类似与编译器里面的语法树，
-它代表 pyim 输入的字符串 entered 解析得到的一个结构化对象，
-以全拼输入法的为例：
-
-1. entered: nihaoma
-2. imobj: ((\"n\" \"i\" \"n\" \"i\") (\"h\" \"ao\" \"h\" \"ao\") (\"m\" \"a\" \"m\" \"a\"))
-
-而 imobjs 是 imobj 组成的一个列表，因为有模糊音等概念的存在，一个
-entered 需要以多种方式或者多步骤解析，得到多种可能的 imobj, 这些
-imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
-
-1. entered: guafeng (设置了模糊音 en -> eng)
-2. imobj-1: ((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"en\" \"f\" \"eng\"))
-3. imobj-2: ((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"eng\" \"f\" \"eng\"))
-4. imobjs:  (((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"en\" \"f\" \"eng\"))
-             ((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"eng\" \"f\" \"eng\")))
-
-这个变量用来保存解析得到的 imobjs。
-
-解析完成之后，pyim 会为每一个 imobj 创建对应 code 字符串, 然后在词库
-中搜索 code 字符串来得到所需要的词条，最后使用特定的方式将得到的
-词条组合成一个候选词列表：`pyim-candidates' 并通过 pyim-page 相关
-功能来显示选词框，供用户选择词条，比如：
-
-1. imobj: ((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"en\" \"f\" \"en\"))
-2. code: gua-fen
-
-从上面的说明可以看出，imobj 本身也是有结构的：
-
-1. imobj: ((\"g\" \"ua\" \"g\" \"ua\") (\"f\" \"en\" \"f\" \"en\"))
-
-我们将 (\"g\" \"ua\" \"g\" \"ua\") 这些子结构，叫做 imelem (IM element), *大
-多数情况下*, 一个 imelem 能够代表一个汉字，这个概念在编辑 entered
-的时候，非常有用。
-
-另外要注意的是，不同的输入法， imelem 的内部结构是不一样的，比如：
-1. quanping:  (\"g\" \"ua\" \"g\" \"ua\")
-2. shuangpin: (\"h\" \"ao\" \"h\" \"c\")
-3. wubi:      (\"aaaa\")")
-
-(pyim-register-local-variables '(pyim-imobjs))
-
 (cl-defgeneric pyim-imobjs-create (entered scheme)
   "按照 SCHEME 对应的输入法方案，从 ENTERED 字符串中创建一个
 或者多个 imobj 组成的列表，不同的输入法，imobj 的结构也是不一样的。")
@@ -91,7 +46,7 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
 这个 imobjs 可能包含一个 imobj, 也可能包含多个，每个 imobj 都包含
 声母和韵母的相关信息，比如：
 
-    (pyim-imobjs-create \"woaimeinv\" (pyim-scheme-get (quote quanpin)))
+    (pyim-imobjs-create \"woaimeinv\" (pyim-scheme-get \\='quanpin))
 
 结果为:
 
@@ -100,9 +55,13 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
       (\"m\" \"ei\" \"m\" \"ei\")
       (\"n\" \"v\" \"n\" \"v\")))
 
-如果字符串无法正确处理，则返回 nil, 比如：
+如果字符串无法正确处理，则特殊处理, 比如：
 
-   (pyim-imobjs-create \"ua\" (pyim-scheme-get (quote quanpin)))
+   (pyim-imobjs-create \"ua\" (pyim-scheme-get \\='quanpin))
+
+结果为：
+
+   (((\"\" \"ua\" \"\" \"ua\")))
 
 全拼输入法的 imelem 是四个字符串组成的 list, 类似：
 
@@ -112,8 +71,8 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
 
   (声母1, 韵母1, 声母2, 韵母2)
 
-声母1和声母2一般用来生成 code 字符串，用于词库中寻找词条。声母2和
-韵母2一般用来反向构建 entered 字符串，用于“多次选择生成词条”这个
+声母1和韵母1一般用来生成 code 字符串，用于词库中寻找词条。声母2和
+韵母2一般用来反向构建 entered 字符串，用于 “多次选择生成词条” 这个
 功能。
 
 大多数情况，声母1 = 声母2, 韵母1 = 韵母2, 只有在使用模糊音的时候，

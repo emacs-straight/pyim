@@ -81,9 +81,9 @@ pyim 输入半角标点，函数列表中每个函数都有一个参数：char �
 (defvar pyim-punctuation-translate-p '(auto yes no)
   "这个变量的第一个元素的取值用于控制标点符号全角半角模式切换.
 
-1. 当第一个元素为 'yes 时，输入全角标点。
-2. 当第一个元素为 'no 时，输入半角标点。
-3. 当第一个元素为 'auto 时，根据中英文环境，自动切换。")
+1. 当第一个元素为 \\='yes 时，输入全角标点。
+2. 当第一个元素为 \\='no 时，输入半角标点。
+3. 当第一个元素为 \\='auto 时，根据中英文环境，自动切换。")
 
 (defvar pyim-punctuation-pair-status
   '(("\"" nil) ("'" nil))
@@ -109,9 +109,9 @@ If you don't like this function, set the variable to nil")
 `pyim-process-punctuation-full-width-p' 函数的返回值，来决定是否转换标点
 符号：
 
-1. 当返回值为 'yes 时，`pyim-process-outcome-handle-char' 转换标点符号，从而输入全角标点。
-2. 当返回值为 'no 时，`pyim-process-outcome-handle-char' 忽略转换，从而输入半角标点。
-3. 当返回值为 'auto 时，根据中英文环境，自动切换。"
+1. 当返回值为 \\='yes 时，`pyim-process-outcome-handle-char' 转换标点符号，从而输入全角标点。
+2. 当返回值为 \\='no 时，`pyim-process-outcome-handle-char' 忽略转换，从而输入半角标点。
+3. 当返回值为 \\='auto 时，根据中英文环境，自动切换。"
   (interactive)
   (setq pyim-punctuation-translate-p
         `(,@(cdr pyim-punctuation-translate-p)
@@ -141,8 +141,8 @@ If you don't like this function, set the variable to nil")
 (defun pyim-punctuation-translate (&optional punct-style)
   "将光标前1个或前后连续成对的n个标点符号进行全角/半角转换.
 
-当 PUNCT-STYLE 设置为 'full-width 时，所有的标点符号转换为全角符
-号，设置为 'half-width 时，转换为半角符号。"
+当 PUNCT-STYLE 设置为 \\='full-width 时，所有的标点符号转换为全角符
+号，设置为 \\='half-width 时，转换为半角符号。"
   (interactive)
   (let ((punc-list (pyim-flatten-tree pyim-punctuation-dict))
         (punct-style
@@ -193,11 +193,11 @@ If you don't like this function, set the variable to nil")
   "返回合适的标点符号，PUNCT-LIST 为标点符号列表.
 
 这个函数用于处理成对的全角标点符号，简单来说：如果第一次输入的标
-点是：（‘）时，那么下一次输入的标点就是（’）。
+点是: (\\=“) 时，那么下一次输入的标点就是 (\\=”) 。
 
 PUNCT-LIST 格式类似：
 
-   `(\",\" \"，\") 或者：`(\"'\" \"‘\" \"’\")
+   (\",\" \"，\") 或者：(\"\\='\" \"\\=‘\" \"\\=’\")
 
 当 BEFORE 为 t 时，只返回切换之前的结果，这个用来获取切换之前的
 标点符号。

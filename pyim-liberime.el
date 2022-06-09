@@ -141,7 +141,7 @@
          (words (liberime-search s (* pyim-page-length 2))))
     words))
 
-(cl-defmethod pyim-candidates-create-limit-time (imobjs (scheme pyim-scheme-rime) _orig-candidates)
+(cl-defmethod pyim-candidates-create-limit-time (imobjs (scheme pyim-scheme-rime))
   "适用于 rime 的 `pyim-candidates-create-limit-time' 方法。"
   (let* ((code (car (pyim-codes-create (car imobjs) scheme)))
          (code-prefix (pyim-scheme-code-prefix scheme))
@@ -189,7 +189,7 @@
        (reverse pyim-liberime-word-log))
       ;; 使用 rime 的同时，也附带的优化 quanpin 的词库。
       (let ((pyim-default-scheme 'quanpin))
-        (if (member (pyim-outcome-get) pyim-candidates)
+        (if (member (pyim-outcome-get) (pyim-process-get-candidates))
             (pyim-process-create-word (pyim-outcome-get) t)
           (pyim-process-create-word (pyim-outcome-get))))
       (setq pyim-liberime-code-log nil)
