@@ -106,16 +106,12 @@
 
 ;; ** 从 dhashcache 搜索词条相关函数
 (cl-defmethod pyim-dcache-get
-  (code &context ((pyim-dcache-backend) (eql pyim-dhashcache))
-        &optional from)
-  "从 FROM 对应的 dcaches 中搜索 CODE, 得到对应的词条.
+  (key &context ((pyim-dcache-backend) (eql pyim-dhashcache))
+       &optional from)
+  "从 FROM 中搜索 key, 得到对应的结果。
 
-当词库文件加载完成后，pyim 就可以用这个函数从词库缓存中搜索某个
-code 对应的中文词条了。
-
-如果 FROM 为 nil, 则默认搜索 `pyim-dhashcache-icode2word' 和
-`pyim-dhashcache-code2word' 两个 dcache."
-  (when code
+用于 pyim-dhashcache 类型的 dcache 后端。"
+  (when key
     (let* ((caches (mapcar (lambda (x)
                              (intern (concat "pyim-dhashcache-" (symbol-name x))))
                            (or (and from
@@ -126,18 +122,13 @@ code 对应的中文词条了。
            result)
       (dolist (cache caches)
         (let* ((cache (ignore-errors (symbol-value cache)))
-               (value (and cache (gethash code cache))))
+               (value (and cache (gethash key cache))))
           ;; 处理 iword2count.
           (unless (listp value)
             (setq value (list value)))
           (when value
             (setq result (append result value)))))
       result)))
-
-;; ** 从 dhashcache 搜索代码相关函数
-(cl-defmethod pyim-dcache-search-word-code
-  (string &context ((pyim-dcache-backend) (eql pyim-dhashcache)))
-  (gethash string pyim-dhashcache-word2code))
 
 ;; ** 给 dhashcache 添加词条相关函数
 (cl-defmethod pyim-dcache-insert-word
