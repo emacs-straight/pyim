@@ -211,8 +211,7 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
 (defun pyim-process-save-dcaches (&optional force)
   "PYIM 流程，保存 dcache."
   (when force
-    (pyim-dcache-save-caches))
-  t)
+    (pyim-dcache-save-caches)))
 
 (defun pyim-process-update (&optional force)
   (pyim-dcache-update force))
@@ -296,21 +295,27 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
   "确定 pyim 是否需要启动中文输入模式."
   (let* ((scheme (pyim-scheme-current))
          (first-chars (pyim-scheme-first-chars scheme))
-         (rest-chars (pyim-scheme-rest-chars scheme)))
-    (and (or (pyim-process-force-input-chinese-p)
-             (and (not pyim-process-input-ascii)
-                  (not (pyim-process-auto-switch-english-input-p))))
-         (if (not (string< "" (pyim-entered-get 'point-before)))
-             (member last-command-event
-                     (mapcar #'identity first-chars))
-           (member last-command-event
-                   (mapcar #'identity rest-chars))))))
+         (rest-chars (pyim-scheme-rest-chars scheme))
+         (entered (pyim-entered-get 'point-before)))
+    (and (pyim-process-input-chinese-predicate-1)
+         (pyim-process-input-chinese-predicate-2
+          last-command-event entered first-chars rest-chars))))
 
-(defun pyim-process-indicator-function ()
-  "Indicator function."
+(defun pyim-process-input-chinese-predicate-1 ()
+  "`pyim-process-input-chinese-p' 内部函数，测试环境。"
   (or (pyim-process-force-input-chinese-p)
       (and (not pyim-process-input-ascii)
            (not (pyim-process-auto-switch-english-input-p)))))
+
+(defun pyim-process-input-chinese-predicate-2 (event entered first-chars rest-chars)
+  "`pyim-process-input-chinese-p' 内部函数，测试输入。"
+  (if (not (string< "" entered))
+      (member event (mapcar #'identity first-chars))
+    (member event (mapcar #'identity rest-chars))))
+
+(defun pyim-process-indicator-function ()
+  "Indicator function."
+  (pyim-process-input-chinese-predicate-1))
 
 (defun pyim-process-run ()
   "查询 entered 字符串, 显示备选词等待用户选择。"
@@ -348,7 +353,11 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
 
 3. 如果返回的 list 中包含 :replace-with \"xxx\" 信息，那么
 \"xxx\" 上屏。"
-  (let* ((results (pyim-process-autoselector-results))
+  (let* ((results
+          ;; autoselector 功能会影响手动连续选择功能，所以这里做了一些限制，
+          ;; 只有在输入的时候才能够触发 autoselector 机制。
+          (when (pyim-process-self-insert-command-p this-command)
+            (pyim-process-autoselector-results)))
          (select-last-word
           (pyim-process-autoselector-find-result results 'last))
          (select-current-word
@@ -381,14 +390,14 @@ imobj 组合构成在一起，构成了 imobjs 这个概念。比如：
 
 (defun pyim-process-autoselector-results ()
   "运行所有 autoselectors, 返回结果列表。"
-  ;; autoselector 功能会影响手动连续选择功能，所以这里做了一些限制，
-  ;; 只有在输入的时候才能够触发 autoselector 机制。
-  (when (pyim-process-self-insert-command-p this-command)
-    (mapcar (lambda (x)
-              (when (functionp x)
-                (ignore-errors
-                  (funcall x))))
-            (cl-remove-duplicates pyim-process-autoselector :from-end t))))
+  (mapcar (lambda (x)
+            (when (functionp x)
+              (ignore-errors
+                (funcall x))))
+          (cl-remove-duplicates
+           pyim-process-autoselector
+           :from-end t
+           :test #'equal)))
 
 (defun pyim-process-self-insert-command-p (cmd)
   "测试 CMD 是否是一个 pyim self insert command."
