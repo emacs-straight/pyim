@@ -30,7 +30,8 @@
 (require 'cl-lib)
 ;; Emacs 26.1 之前的版本无法安装 posframe.
 (require 'posframe nil t)
-;; popup 不是 GNU ELPA 包，所以 pyim 不能强制依赖它。
+;; popup 不是 gnu elpa 包，所以不应该在这里加载它，加载它是由于向后兼容的原因，
+;; 未来可能删除。
 (require 'popup nil t)
 (require 'pyim-common)
 (require 'pyim-process)
@@ -53,15 +54,19 @@
 2. 当这个变量取值为 popup 时，使用 popup-el 包来绘制选词框，
    这个选项可以在 emacs 图形版和终端版使用，速度没有 posframe 快，
    偶尔会遇到选词框错位的问题。
-3. 当这个变量取值为 minibuffer 时，minibuffer 将做为选词框，
+3. 当这个变量取值为 popon 时，使用 popon 包来绘制选词框，这个选项
+   效果类似 popup, 不过目前不支持背景颜色。
+4. 当这个变量取值为 minibuffer 时，minibuffer 将做为选词框，
    这个选项也作为其他选项不可用时的 fallback.
-4. 当这个变量的取值是为一个 list 时，pyim 将按照优先顺序动态
+5. 当这个变量的取值是为一个 list 时，pyim 将按照优先顺序动态
    选择一个当前环境可用的 tooltip."
   :type '(choice (repeat (choice (const posframe)
                                  (const popup)
+                                 (const popon)
                                  (const minibuffer)))
                  (const posframe)
                  (const popup)
+                 (const popon)
                  (const minibuffer)))
 
 (defcustom pyim-page-style 'two-lines
@@ -123,8 +128,25 @@ Only useful when use posframe.")
 (defvar pyim-page-last-popup nil
   "这个变量用来保存做为 page tooltip 的 popup.")
 
+(defvar pyim-page-last-popon nil
+  "这个变量用来保存做为 page tooltip 的 popon.")
+
 (defvar pyim-page-last-minibuffer-string nil
   "函数 `pyim-page-show-with-minibuffer' 上一次处理的消息字符串。")
+
+(defvar pyim-page-tooltip-infos
+  '((posframe
+     :package posframe
+     :test posframe-workable-p)
+    (popup
+     :package popup)
+    (popon
+     :package popon)
+    (minibuffer
+     :package minibuffer))
+  "pyim-page tooltip 相关信息。
+
+用于函数 `pyim-page-tooltip-valid-p'.")
 
 (defun pyim-page-refresh (&optional hightlight-current)
   "刷新 page 页面的函数.
@@ -232,7 +254,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
      (1- (pyim-page-start))))
 
 (defun pyim-page-get-valid-tooltip ()
-  "获取一个可用的 tooltip."
+  "根据当前环境，获取一个可用的 tooltip."
   (cond
    ;; NOTE: 以前在 minibuffer 中试用过 posframe, linux 环境下运行效果还不错，但
    ;; 在 windows 环境下，似乎有很严重的性能问题，原因未知。
@@ -240,17 +262,23 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
    ;; 在 exwm-xim 环境下输入中文时，只能使用 minibuffer, 因为应用窗口遮挡的缘故，
    ;; 其它方式不可用。
    ((pyim-exwm-xim-environment-p) 'minibuffer)
-   (t (or (cl-find-if (lambda (tp)
-                        (or (and (eq tp 'posframe)
-                                 (functionp 'posframe-workable-p)
-                                 (posframe-workable-p))
-                            (and (eq tp 'popup)
-                                 (featurep 'popup))
-                            (eq tp 'minibuffer)))
+   (t (or (cl-find-if #'pyim-page-tooltip-valid-p
                       (if (listp pyim-page-tooltip)
                           pyim-page-tooltip
                         (list pyim-page-tooltip)))
           'minibuffer))))
+
+(defun pyim-page-tooltip-valid-p (tooltip)
+  "测试 TOOLTIP 当前是否可用。"
+  (let* ((info (alist-get tooltip pyim-page-tooltip-infos))
+         (package (plist-get info :package))
+         (test-func (plist-get info :test)))
+    (cond
+     ((not (featurep package)) nil)
+     ((not (functionp test-func)) t)
+     ((and (functionp test-func)
+           (funcall test-func)) t)
+     (t nil))))
 
 (defun pyim-page-get-page-style (tooltip)
   "依照 TOOLTIP 和 `pyim-page-style', 得到一个 page style."
@@ -270,7 +298,7 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
   (1+ (/ (1- (pyim-process-candidates-length)) pyim-page-length)))
 
 (cl-defgeneric pyim-page-show (string position tooltip)
-  "在 POSITION 位置，使用 posframe 或者 popup 显示字符串 STRING.")
+  "在 POSITION 位置，使用 TOOLTIP 显示字符串 STRING.")
 
 (cl-defmethod pyim-page-show (string position (_tooltip (eql posframe)))
   "在 POSITION 位置，使用 posframe STRING."
@@ -310,14 +338,14 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
                       (make-string n ?\ )))
                 string)))))))
 
-(declare-function 'popup-tip "popup")
-(declare-function 'popup-delete "popup")
+(declare-function popup-tip "popup")
+(declare-function popup-delete "popup")
 (defvar popup-version)
 
 (cl-defmethod pyim-page-show (string position (_tooltip (eql popup)))
   "Show STRING at POSITION with the help of popup-el."
   (when pyim-page-last-popup
-    ;; 异步获取词条的时候，如果不把已经存在的 popup 删除，就会出现两个 page.
+    ;; 延迟获取词条的时候，如果不把已经存在的 popup 删除，就会出现两个 page.
     (popup-delete pyim-page-last-popup))
   (setq pyim-page-last-popup
         (apply #'popup-tip string
@@ -325,6 +353,21 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
                ;; popup v0.5.9 以后才支持 face 参数
                (unless (version<= popup-version "0.5.8")
                  (list :face 'pyim-page)))))
+
+(declare-function popon-create "popon")
+(declare-function popon-kill "popon")
+(declare-function popon-x-y-at-pos "popon")
+
+(cl-defmethod pyim-page-show (string position (_tooltip (eql popon)))
+  "Show STRING at POSITION with the help of popon."
+  (when pyim-page-last-popon
+    ;; 延迟获取词条的时候，如果不把已经存在的 popon 删除，就会出现两个 page.
+    (popon-kill pyim-page-last-popon))
+  (let* ((x-y (popon-x-y-at-pos position))
+         (x (car x-y))
+         (y (cdr x-y)))
+    (setq pyim-page-last-popon
+          (popon-create string (cons x (+ y 1))))))
 
 (cl-defgeneric pyim-page-info-format (style page-info)
   "将 PAGE-INFO 按照 STYLE 格式化为选词框中显示的字符串。")
@@ -539,6 +582,10 @@ page 的概念，比如，上面的 “nihao” 的 *待选词列表* 就可以�
 (cl-defmethod pyim-page-hide-tooltip ((_tooltip (eql popup)))
   "Hide popup tooltip."
   (popup-delete pyim-page-last-popup))
+
+(cl-defmethod pyim-page-hide-tooltip ((_tooltip (eql popon)))
+  "Hide popon tooltip."
+  (popon-kill pyim-page-last-popon))
 
 (cl-defmethod pyim-page-hide-tooltip ((_tooltip (eql posframe)))
   "Hide posframe tooltip."
