@@ -904,13 +904,32 @@
       (should (equal (buffer-substring (point-min) (point)) "哈哈")))))
 
 ;; ** pyim-cregexp 相关单元测试
-(ert-deftest pyim-tests-pyim-cregexp ()
-  (let ((wubi (pyim-scheme-get 'wubi))
-        (pyim-default-scheme 'quanpin)
-        (pyim-cregexp-fallback-scheme 'wubi))
-    (should (equal (pyim-scheme-name (pyim-cregexp-scheme)) 'quanpin))
+(ert-deftest pyim-tests-pyim-cregexp-find-scheme ()
+  (should-not (pyim-cregexp-find-scheme nil))
+  (should (equal (pyim-scheme-name (pyim-cregexp-find-scheme 'wubi)) 'wubi))
+  (should-not (pyim-cregexp-find-scheme 'wubi1))
+  (should (equal (pyim-scheme-name (pyim-cregexp-find-scheme (pyim-scheme-get 'wubi))) 'wubi)))
+
+(ert-deftest pyim-tests-pyim-cregexp-scheme ()
+  (let ((wubi (pyim-scheme-get 'wubi)))
     (should (equal (pyim-scheme-name (pyim-cregexp-scheme wubi)) 'wubi)))
 
+  (let ((wubi (pyim-scheme-get 'wubi1))
+        (pyim-default-scheme 'quanpin))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme wubi)) 'quanpin)))
+
+  (let ((pyim-default-scheme 'quanpin))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme)) 'quanpin)))
+
+  (let ((pyim-default-scheme 'quanpin1)
+        (pyim-cregexp-fallback-scheme 'wubi))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme)) 'wubi)))
+
+  (let ((pyim-default-scheme 'quanpin1)
+        (pyim-cregexp-fallback-scheme 'wubi1))
+    (should (equal (pyim-scheme-name (pyim-cregexp-scheme)) 'quanpin))))
+
+(ert-deftest pyim-tests-pyim-cregexp ()
   (let ((regexp (pyim-cregexp-build "nihao")))
     (should (string-match-p regexp "nihao"))
     (should (string-match-p regexp "anihaob"))
@@ -951,8 +970,8 @@
 
   (let* ((str (nth 2 (split-string (car (pyim-pymap-py2cchar-get "wang" t)) "|")))
          (quanpin (pyim-scheme-get 'quanpin))
-         (regexp1 (pyim-cregexp-create-1 "wang" quanpin 3 nil))
-         (regexp2 (pyim-cregexp-create-1 "wang" quanpin 2)))
+         (regexp1 (pyim-cregexp-create-cregexp-from-string "wang" quanpin 3 nil))
+         (regexp2 (pyim-cregexp-create-cregexp-from-string "wang" quanpin 2)))
     (should (string-match-p regexp1 str))
     (should-not (string-match-p regexp2 str)))
 
@@ -974,8 +993,11 @@
     (should (equal (pyim-cregexp-build "adww") "\\(?:adww\\|[其匧惹斯欺歁莢蒙][人古]?人?\\)"))
     (should (equal (pyim-cregexp-build "aaaa'aaaa")
                    "\\(?:\\(?:aaaa'\\|aaaa\\|[工恭]恭?敬?敬?\\)\\(?:aaaa\\|[工恭]恭?敬?敬?\\)\\)"))
-    (should (equal (pyim-cregexp-create-1 "aaaa'aaaa" wubi)
-                   "\\(?:aaaa'\\|aaaa\\|[工恭][恭]?[敬]?[敬]?\\)\\(?:aaaa\\|[工恭][恭]?[敬]?[敬]?\\)")))
+    (should (equal (pyim-cregexp-create-cregexp-from-string "aaaa'aaaa" wubi)
+                   "\\(?:aaaa'\\|aaaa\\|[工恭][恭]?[敬]?[敬]?\\)\\(?:aaaa\\|[工恭][恭]?[敬]?[敬]?\\)"))
+    (should (equal (pyim-cregexp-build-xingma-regexp-from-words '("工" "恭恭敬敬"))
+                   "[工恭][恭]?[敬]?[敬]?"))
+    )
 
   (with-temp-buffer
     (insert "haha nihao")
@@ -995,6 +1017,41 @@
           (string "\\(?:nihao\\|[㒟㖏㖕㖖㖻㘈㘝㘨㘿㙞㚔㜤㜦㜵㜸㝕㞋㞙㞾㟧㠜㠡㡪㣇㣷㤛㥾㦐㧱㩘㩶㪒㭤㮆㮏㮞㮟㲡㲰㲻㲽㳮㴪㵫㸎㹸㺲㼭㽱㿦䀑䀔䁥䂇䂼䃵䄒䄭䄹䆨䇣䋴䋻䌜䌰䍲䏔䐁䒜䔭䕥䖆䗿䘌䘦䘽䙚䚓䚾䛏䛘䜆䜓䝚䞕䟢䡾䤔䦊䦵䧇䧔䩞䬯䭃䭢䭲䮍䮗䮘䯀䯅䯵䰯䳖䴴䵑䵒乜伱伲佞你侫倪儗儜儞兒凝匿卄呢咛唸啮喦嗫噛嚀嚙囁囐囓囜圼坭埝埿堄妞妮妳姩娘婗嫋嫟嬝嬢嬣嬲嬺孃孨孴孼孽宁寍寕寗寜寧尼尿屔屰峊嵲嶭巕帇年廿念忸怓怩恁您惄惗愵慝懝扭抐抝抳拈拗拟拧拰捏捻掜揑摂摄摰撚撵擜擬擰攆敜旎昵晲暱杻枿柅柠棿榐槷樢橣檷檸櫱氼氽汼沑泞泥涅涊淣淰湼溓溺濘炄牛牜狃狋狔狞猊獰甯疌疒痆眤睨矃碾祢禰秊秜秥篞簐籋籾粘糱糵紐縌纽聂聍聶聹聻胒脲腝腻膩臡臬臲艌苧苨苶茑茮莥菍蔦蔫薴薿蘖蘗蚭蚴蛪蜺蠥衂衵袅裊褭褹觬誽諗譺讘貎跈跜踂踗蹍蹑蹨躎躡輗輦輾辇辗迡逆郳酿醸釀鈕鈢鈮鉨鉩銸鋷錜鎳鑈鑏鑷钀钮铌镊镍闑陧隉隬霓靵顳颞馜鬡鬤鮎鯓鯢鯰鲇鲵鲶鳥鶂鷊鸋鸟鸮鹝鹢麑黏鼰齞齧齯][㕺㘪㙱㚪㝀㞻㠙㩝㬔㬶㵆䒵䚽䝞䝥䧚䧫䪽䬉䯫侾傐儫勂号呺哠嗥嘷噑嚆嚎壕好峼恏悎昊昦晧暠暤暭曍椃毫浩淏滈澔濠瀥灏灝狢獆獋獔皓皜皞皡皥秏竓籇耗聕茠蒿薃薅薧藃號虠蚝蠔諕譹诐豪貉郝鄗鎬镐顥颢鰝鶴鸮]\\)"))
       (pyim-cregexp-convert-at-point)
       (should (equal (buffer-string) (concat "hiXXX: " string))))))
+
+(ert-deftest pyim-tests-pyim-cregexp-quanpin-get-pinyin-list ()
+  (should (equal (pyim-cregexp-quanpin-get-pinyin-list
+                  '(("n" "i" "n" "i")
+                    ("h" "ao" "h" "ao")))
+                 '("ni" "hao"))))
+
+(ert-deftest pyim-tests-pyim-cregexp-quanpin-get-cchars-from-pinyin-list ()
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") nil nil nil)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑懝兒䮘㧱聻㮞檷䀑抐誽䍲㮏㲡䘌縌㠜儞䘦鈮䰯伱愵嬺氼䘽䵑䵒屔婗䝚䁥䕥孨㵫屰䭲孴㹸譺㥾籾㦐㪒馜隬蚭抳䦵㲻㞾痆㣇䧇狋䛏胒鯓狔秜跜嫟迡鯢淣苨擬觬埿鑈棿腝蛪㘈眤㩘晲掜禰妳堄儗輗蜺鉨齯鶂貎膩暱惄柅鷊臡郳衵年念粘辗碾廿捻撵拈蔫鲶埝鲇辇黏䟢㮟䧔痆攆簐㘝輦䄭䬯鼰䄹艌䩞蹨㞋躎鮎䚓撚㲽跈秊秥姩鯰㜤䴴輾蹍榐唸卄齞涊淰溓娘酿孃䖆釀嬢醸鸟尿溺袅脲氽茑嬲鸮㼭茮樢䐁㠡蔦褭㜵䙚㭤䦊䮍㞙㒟裊鳥㳮䃵嬝嫋枿摄聂捏涅镍孽坭蘖啮蹑嗫臬镊颞乜陧菍嵲糵㟧㖕䞕峊㜦䜆籋䇣㘨䡾㖏䳖痆㘝踂帇㸎䄒䜓踗䌜錜鈢蠥㴪㜸圼㘿鑈噛㙞鉩㡪顳㩶聶鑷孼钀㮆隉疌㚔㖖嚙躡鎳䂼䯀囁䯅揑巕惗擜篞櫱䯵棿䭃䌰諗褹掜槷囐鋷讘銸嶭蘗摰鉨摂敜齧湼枿闑囓糱臲苶喦您恁㤛䚾䛘囜拰䋻宁凝拧泞柠咛坭狞佞聍甯苧䆨薴濘鸋鬡嬣䔭鑏㝕䭢橣獰聹嚀侫㲰檸矃寍寕寗寜㿦寧擰㣷䗿㩶鬤儜牛纽扭钮拗妞蚴忸狃杻䮗抝牜莥䤔㽱䂇怓紐䀔鈕靵汼炄䒜㺲䏔䋴衂沑㖻" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞椃䬉㬔蠔㠙鰝瀥昦㘪儫㬶嘷㝀㵆獆籇獋恏噑獔聕㩝灝䝞號虠䝥顥晧㙱㕺悎傐皡暤皥㚪暭鶴䒵㞻䚽䪽侾勂滈曍䧚哠狢䧫䯫峼鎬竓藃譹薃澔皜秏諕暠薧呺茠")
+                 ))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") nil t nil)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑懝兒䮘㧱聻㮞檷䀑抐誽䍲㮏㲡䘌縌㠜儞䘦鈮䰯伱愵嬺氼䘽䵑䵒屔婗䝚䁥䕥孨㵫屰䭲孴㹸譺㥾籾㦐㪒馜隬蚭抳䦵㲻㞾痆㣇䧇狋䛏胒鯓狔秜跜嫟迡鯢淣苨擬觬埿鑈棿腝蛪㘈眤㩘晲掜禰妳堄儗輗蜺鉨齯鶂貎膩暱惄柅鷊臡郳衵" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞椃䬉㬔蠔㠙鰝瀥昦㘪儫㬶嘷㝀㵆獆籇獋恏噑獔聕㩝灝䝞號虠䝥顥晧㙱㕺悎傐皡暤皥㚪暭鶴䒵㞻䚽䪽侾勂滈曍䧚哠狢䧫䯫峼鎬竓藃譹薃澔皜秏諕暠薧呺茠")))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil nil)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑懝兒䮘㧱聻㮞檷䀑抐誽䍲㮏㲡䘌縌㠜儞䘦鈮䰯伱愵嬺氼䘽䵑䵒屔婗䝚䁥䕥孨㵫屰䭲孴㹸譺㥾籾㦐㪒馜隬蚭抳䦵㲻㞾痆㣇䧇狋䛏胒鯓狔秜跜嫟迡鯢淣苨擬觬埿鑈棿腝蛪㘈眤㩘晲掜禰妳堄儗輗蜺鉨齯鶂貎膩暱惄柅鷊臡郳衵" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞椃䬉㬔蠔㠙鰝瀥昦㘪儫㬶嘷㝀㵆獆籇獋恏噑獔聕㩝灝䝞號虠䝥顥晧㙱㕺悎傐皡暤皥㚪暭鶴䒵㞻䚽䪽侾勂滈曍䧚哠狢䧫䯫峼鎬竓藃譹薃澔皜秏諕暠薧呺茠")))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil 1)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺" "好号毫豪耗浩郝皓昊镐蒿壕")))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil 2)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮")))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil 3)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞")
+                 ))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil 4)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑懝兒䮘㧱聻㮞檷䀑抐誽䍲㮏㲡䘌縌㠜儞䘦鈮䰯伱愵嬺氼䘽䵑䵒屔婗䝚䁥䕥孨㵫屰䭲孴㹸譺㥾籾㦐㪒馜隬蚭抳䦵㲻㞾痆㣇䧇狋䛏胒鯓狔秜跜嫟迡鯢淣苨擬觬埿鑈棿腝蛪㘈眤㩘晲掜禰妳堄儗輗蜺鉨齯鶂貎膩暱惄柅鷊臡郳衵" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞椃䬉㬔蠔㠙鰝瀥昦㘪儫㬶嘷㝀㵆獆籇獋恏噑獔聕㩝灝䝞號虠䝥顥晧㙱㕺悎傐皡暤皥㚪暭鶴䒵㞻䚽䪽侾勂滈曍䧚哠狢䧫䯫峼鎬竓藃譹薃澔皜秏諕暠薧呺茠")))
+
+  (should (equal (pyim-cregexp-quanpin-get-cchars-from-pinyin-list '("ni" "hao") t nil 5)
+                 '("你尼呢泥拟逆倪妮腻匿霓溺旎昵坭铌鲵伲怩睨祢疒猊慝鹝鹢薿麑懝兒䮘㧱聻㮞檷䀑抐誽䍲㮏㲡䘌縌㠜儞䘦鈮䰯伱愵嬺氼䘽䵑䵒屔婗䝚䁥䕥孨㵫屰䭲孴㹸譺㥾籾㦐㪒馜隬蚭抳䦵㲻㞾痆㣇䧇狋䛏胒鯓狔秜跜嫟迡鯢淣苨擬觬埿鑈棿腝蛪㘈眤㩘晲掜禰妳堄儗輗蜺鉨齯鶂貎膩暱惄柅鷊臡郳衵" "好号毫豪耗浩郝皓昊镐蒿壕灏嚎濠蚝貉颢嗥薅嚆鸮诐淏鄗皞椃䬉㬔蠔㠙鰝瀥昦㘪儫㬶嘷㝀㵆獆籇獋恏噑獔聕㩝灝䝞號虠䝥顥晧㙱㕺悎傐皡暤皥㚪暭鶴䒵㞻䚽䪽侾勂滈曍䧚哠狢䧫䯫峼鎬竓藃譹薃澔皜秏諕暠薧呺茠")))
+
+  )
 
 ;; ** pyim-import 相关单元测试
 (ert-deftest pyim-tests-pyim-import-words-and-counts ()
@@ -1080,6 +1137,7 @@
         (pyim-dhashcache-icode2word (make-hash-table :test #'equal))
         (file (pyim-tests-make-temp-file)))
     (puthash "你好" 10 pyim-dhashcache-iword2count)
+    (puthash "锕系" 10 pyim-dhashcache-iword2count)
     (puthash "尼耗" 1 pyim-dhashcache-iword2count)
     (puthash "wo-hao" (list "我好") pyim-dhashcache-icode2word)
     (puthash "ni-hao" (list "你好" "尼耗") pyim-dhashcache-icode2word)
@@ -1088,8 +1146,9 @@
       (insert-file-contents file)
       (should (equal (buffer-string)
                      ";;; -*- coding: utf-8-unix -*-
-你好 10
+锕系 10
 尼耗 1
+你好 10
 我好 0
 ")))
     (pyim-dcache-export-words-and-counts file nil t)
@@ -1097,8 +1156,9 @@
       (insert-file-contents file)
       (should (equal (buffer-string)
                      ";;; -*- coding: utf-8-unix -*-
-你好
+锕系
 尼耗
+你好
 我好
 ")))
     (pyim-dcache-export-personal-words file)
@@ -1157,6 +1217,19 @@ wo-hao 我好
                    '("/home/user/test3.pyim" "/home/user/test2.pyim")))))
 
 ;; ** pyim-dhashcache 相关单元测试
+(ert-deftest pyim-tests-pyim-dhashcache-pinyin-string< ()
+  (should (pyim-dhashcache-pinyin-string< "啊" "波"))
+  (should-not (string< "锕" "波"))
+  (should (pyim-dhashcache-pinyin-string< "锕" "波"))
+  (should-not (pyim-dhashcache-pinyin-string< "波" "啊"))
+  (should (pyim-dhashcache-pinyin-string< "a" "b"))
+  (should-not (pyim-dhashcache-pinyin-string< "b" "a"))
+  (should (pyim-dhashcache-pinyin-string< "aa" "ab"))
+  (should-not (pyim-dhashcache-pinyin-string< "ab" "aa"))
+  (should (pyim-dhashcache-pinyin-string< "你不好" "你好"))
+  (should-not (pyim-dhashcache-pinyin-string< "你好" "你不好"))
+  )
+
 (ert-deftest pyim-tests-pyim-dhashcache-get-shortcodes ()
   (should (equal (pyim-dhashcache-get-shortcodes ".abcde") nil))
   (should (equal (pyim-dhashcache-get-shortcodes "wubi/abcde")
