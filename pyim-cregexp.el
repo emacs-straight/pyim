@@ -52,20 +52,20 @@
 这个函数的功能和 `pyim-cregexp-build' 类似，大多数参数也相同，不
 同点是这个函数没有 scheme 参数，它会根据 `pyim-default-scheme' 和
 `pyim-cregexp-fallback-scheme' 等信息动态的获取 scheme."
-  (let ((scheme (pyim-cregexp-scheme)))
+  (let ((scheme (pyim-cregexp--scheme)))
     (pyim-cregexp-create string scheme char-level-num chinese-only)))
 
-(defun pyim-cregexp-scheme (&optional scheme)
+(defun pyim-cregexp--scheme (&optional scheme)
   "返回一个支持 cregexp 的 scheme.
 
 这个函数同时考虑 SCHEME, `pyim-default-scheme' 和
 `pyim-cregexp-fallback-scheme'."
-  (or (pyim-cregexp-find-scheme scheme)
-      (pyim-cregexp-find-scheme pyim-default-scheme)
-      (pyim-cregexp-find-scheme pyim-cregexp-fallback-scheme)
-      (pyim-cregexp-find-scheme 'quanpin)))
+  (or (pyim-cregexp--find-scheme scheme)
+      (pyim-cregexp--find-scheme pyim-default-scheme)
+      (pyim-cregexp--find-scheme pyim-cregexp-fallback-scheme)
+      (pyim-cregexp--find-scheme 'quanpin)))
 
-(defun pyim-cregexp-find-scheme (scheme-or-name)
+(defun pyim-cregexp--find-scheme (scheme-or-name)
   "如果 SCHEME-OR-NAME 支持 cregexp 功能，就返回对应的 scheme."
   (let ((scheme (if (pyim-scheme-p scheme-or-name)
                     scheme-or-name
@@ -96,30 +96,30 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
            (> (length string) 0)
            (pyim-scheme-p scheme)
            (pyim-scheme-cregexp-support-p scheme))
-      (pyim-cregexp-create-valid-cregexp-from-string
+      (pyim-cregexp--create-valid-cregexp-from-string
        string scheme char-level-num chinese-only)
     string))
 
-(defun pyim-cregexp-create-valid-cregexp-from-string
+(defun pyim-cregexp--create-valid-cregexp-from-string
     (string scheme &optional char-level-num chinese-only)
   "从 STRING 创建一个有效的搜索中文的 regexp."
   (let ((char-level-num
-         (pyim-cregexp-char-level-num char-level-num))
+         (pyim-cregexp--char-level-num char-level-num))
         rx-string)
-    (while (not (pyim-cregexp-valid-p rx-string))
+    (while (not (pyim-cregexp--valid-p rx-string))
       (setq rx-string
-            (pyim-cregexp-create-beautiful-cregexp-from-string
+            (pyim-cregexp--create-beautiful-cregexp-from-string
              string scheme char-level-num chinese-only))
       (setq char-level-num (1- char-level-num)))
     rx-string))
 
-(defun pyim-cregexp-char-level-num (num)
+(defun pyim-cregexp--char-level-num (num)
   "根据 NUM 返回一个有效的常用汉字级别。"
   (if (numberp num)
       (max (min num 4) 1)
     4))
 
-(defun pyim-cregexp-valid-p (cregexp)
+(defun pyim-cregexp--valid-p (cregexp)
   "Return t when cregexp is a valid regexp."
   (and cregexp
        (stringp cregexp)
@@ -128,50 +128,50 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
          ;; FIXME: Emacs can't handle regexps whose length is too big :-(
          (error nil))))
 
-(defun pyim-cregexp-create-beautiful-cregexp-from-string
+(defun pyim-cregexp--create-beautiful-cregexp-from-string
     (string scheme &optional char-level-num chinese-only)
   "使用 rx 和 xr, 从 STRING 生成一个漂亮的搜索中文的 regexp.
 
 这个 regexp 可能正常使用，也可能长度超出 emacs 的限制。"
   (or (ignore-errors
         (rx-to-string
-         (pyim-cregexp-create-cregexp-from-rx
+         (pyim-cregexp--create-cregexp-from-rx
           (lambda (x)
             (if (stringp x)
-                (xr (pyim-cregexp-create-cregexp-from-string
+                (xr (pyim-cregexp--create-cregexp-from-string
                      x scheme char-level-num chinese-only))
               x))
           (xr string))))
       string))
 
-(defun pyim-cregexp-create-cregexp-from-rx (fn rx-form)
+(defun pyim-cregexp--create-cregexp-from-rx (fn rx-form)
   (pcase rx-form
     ('nil nil)
     (`(,form) (funcall fn form))
     (`(any . ,_) rx-form)
     (`(,_ . ,_)
      (mapcar (lambda (x)
-               (pyim-cregexp-create-cregexp-from-rx fn x))
+               (pyim-cregexp--create-cregexp-from-rx fn x))
              rx-form))
     (_ (funcall fn rx-form))))
 
-(defun pyim-cregexp-create-cregexp-from-string
+(defun pyim-cregexp--create-cregexp-from-string
     (string scheme &optional char-level-num chinese-only)
-  (let* ((char-level-num (pyim-cregexp-char-level-num char-level-num))
-         (string-list (pyim-cregexp-split-string string)))
+  (let* ((char-level-num (pyim-cregexp--char-level-num char-level-num))
+         (string-list (pyim-cregexp--split-string string)))
     ;; 确保 pyim 词库加载
     (pyim-dcache-init-variables)
-    (pyim-cregexp-create-cregexp-from-string-list
+    (pyim-cregexp--create-cregexp-from-string-list
      string-list scheme char-level-num chinese-only)))
 
-(defun pyim-cregexp-split-string (string)
+(defun pyim-cregexp--split-string (string)
   (let ((sep "#####&&&&#####"))
     (remove "" (split-string
                 (replace-regexp-in-string
                  "\\([a-z]+'*\\)" (concat sep "\\1" sep) string)
                 sep))))
 
-(defun pyim-cregexp-create-cregexp-from-string-list
+(defun pyim-cregexp--create-cregexp-from-string-list
     (string-list scheme &optional char-level-num chinese-only)
   (mapconcat
    (lambda (string)
@@ -208,10 +208,10 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
   (imobj (_scheme pyim-scheme-quanpin)
          &optional match-beginning first-equal all-equal char-level-num)
   "从 IMOBJ 创建一个搜索中文的 regexp, 适用于全拼输入法。"
-  (let* ((num (pyim-cregexp-char-level-num char-level-num))
-         (pinyin-list (pyim-cregexp-quanpin-get-pinyin-list imobj))
+  (let* ((num (pyim-cregexp--char-level-num char-level-num))
+         (pinyin-list (pyim-cregexp--quanpin-get-pinyin-list imobj))
          (cchars-list
-          (pyim-cregexp-quanpin-get-cchars-from-pinyin-list
+          (pyim-cregexp--quanpin-get-cchars-from-pinyin-list
            pinyin-list all-equal first-equal num))
          (regexp
           (mapconcat (lambda (x)
@@ -221,16 +221,16 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
     (unless (equal regexp "")
       (concat (if match-beginning "^" "") regexp))))
 
-(defun pyim-cregexp-quanpin-get-pinyin-list (imobj)
+(defun pyim-cregexp--quanpin-get-pinyin-list (imobj)
   "从 IMOBJ 生成类似 (\"ni\" \"hao\") 的拼音列表。"
   (mapcar (lambda (x)
             (concat (nth 0 x) (nth 1 x)))
           imobj))
 
-(defun pyim-cregexp-quanpin-get-cchars-from-pinyin-list
+(defun pyim-cregexp--quanpin-get-cchars-from-pinyin-list
     (pinyin-list all-equal first-equal char-level-num)
   "(\"ni\" \"hao\") => (\"你 ... 蔫 ... 鸟 ... 宁 ...\" \"好号毫\")"
-  (let ((num (pyim-cregexp-char-level-num char-level-num))
+  (let ((num (pyim-cregexp--char-level-num char-level-num))
         (n 0)
         results)
     (dolist (py pinyin-list)
@@ -260,13 +260,13 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
                                         (if first-equal
                                             (substring x 0 1)
                                           x))))
-                      (pyim-cregexp-build-xingma-regexp-from-words
+                      (pyim-cregexp--build-xingma-regexp-from-words
                        (pyim-dcache-get code '(code2word)))))
                   imobj "")))
     (unless (equal regexp "")
       (concat (if match-beginning "^" "") regexp))))
 
-(defun pyim-cregexp-build-xingma-regexp-from-words (words)
+(defun pyim-cregexp--build-xingma-regexp-from-words (words)
   "根据 WORDS, 创建一个可以搜索这些 WORDS 的 regexp.
 
 比如：工, 恭恭敬敬 => [工恭][恭]?[敬]?[敬]?

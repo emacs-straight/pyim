@@ -85,18 +85,18 @@ pyim 输入半角标点，函数列表中每个函数都有一个参数：char �
 2. 当第一个元素为 \\='no 时，输入半角标点。
 3. 当第一个元素为 \\='auto 时，根据中英文环境，自动切换。")
 
-(defvar pyim-punctuation-pair-status
-  '(("\"" nil) ("'" nil))
-  "成对标点符号切换状态.")
-
 (defvar pyim-punctuation-escape-list (number-sequence ?0 ?9)
   "Punctuation will not insert after this characters.
 
 If you don't like this function, set the variable to nil")
 
+(defvar pyim-punctuation--pair-status
+  '(("\"" nil) ("'" nil))
+  "成对标点符号切换状态.")
+
 (pyim-register-local-variables
  '(pyim-punctuation-translate-p
-   pyim-punctuation-pair-status
+   pyim-punctuation--pair-status
    pyim-punctuation-escape-list
    pyim-punctuation-half-width-functions))
 
@@ -106,7 +106,7 @@ If you don't like this function, set the variable to nil")
 
 每次运行 `pyim-punctuation-toggle' 命令，都会调整变量
 `pyim-punctuation-translate-p' 的取值，`pyim-process-outcome-handle-char' 根据
-`pyim-process-punctuation-full-width-p' 函数的返回值，来决定是否转换标点
+`pyim-process--punctuation-full-width-p' 函数的返回值，来决定是否转换标点
 符号：
 
 1. 当返回值为 \\='yes 时，`pyim-process-outcome-handle-char' 转换标点符号，从而输入全角标点。
@@ -203,20 +203,22 @@ PUNCT-LIST 格式类似：
 标点符号。
 
 函数 `pyim-punctuation-return-proper-punct' 内部，我们使用变量
-`pyim-punctuation-pair-status' 来记录 “成对” 中文标点符号的状态。"
+`pyim-punctuation--pair-status' 来记录 “成对” 中文标点符号的状态。"
   (let* ((str (car punc-list))
          (punc (cdr punc-list))
-         (switch-p (cdr (assoc str pyim-punctuation-pair-status))))
+         (switch-p (cdr (assoc str pyim-punctuation--pair-status))))
     (if (= (safe-length punc) 1)
         (car punc)
       (if before
           (setq switch-p (not switch-p))
-        (setf (cdr (assoc str pyim-punctuation-pair-status))
+        (setf (cdr (assoc str pyim-punctuation--pair-status))
               (not switch-p)))
       (if switch-p
           (car punc)
         (nth 1 punc)))))
 
+(defun pyim-punctuation-escape-p (char)
+  (member char pyim-punctuation-escape-list))
 
 ;; * Footer
 (provide 'pyim-punctuation)

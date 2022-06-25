@@ -103,7 +103,7 @@
 (declare-function liberime-process-key "liberime" (keycode &optional mask))
 (declare-function liberime-select-candidate "liberime" (num))
 
-(defun pyim-liberime-scheme (orig_func)
+(defun pyim-liberime--scheme (orig_func)
   "Advice function of `pyim-scheme-current'."
   (let ((scheme (funcall orig_func)))
     (if (pyim-scheme-rime-p scheme)
@@ -112,7 +112,7 @@
           (pyim-scheme-get 'quanpin))
       scheme)))
 
-(advice-add 'pyim-scheme-current :around #'pyim-liberime-scheme)
+(advice-add 'pyim-scheme-current :around #'pyim-liberime--scheme)
 
 (cl-defmethod pyim-imobjs-create (entered (_scheme pyim-scheme-rime))
   (list (list entered)))
@@ -152,51 +152,6 @@
          (words (liberime-search s nil)))
     words))
 
-(cl-defmethod pyim-page-preview-create ((_scheme pyim-scheme-rime) &optional separator)
-  (let* ((preedit (or (liberime-get-preedit)
-                      (pyim-entered-get 'point-before))))
-    (pyim-process-with-entered-buffer
-      (if (equal 1 (point))
-          (concat "|" preedit)
-        (concat (replace-regexp-in-string (concat separator "'") "'" preedit)
-                " |" (buffer-substring-no-properties (point) (point-max)))))))
-
-(defvar pyim-liberime-code-log nil)
-(defvar pyim-liberime-word-log nil)
-(cl-defmethod pyim-select-word-really ((_scheme pyim-scheme-rime))
-  "从选词框中选择当前词条，然后删除该词条对应拼音。"
-  (pyim-process-outcome-handle 'candidate)
-  (let* ((entered (pyim-entered-get 'point-before))
-         (word (string-remove-prefix
-                (or (pyim-outcome-get 1) "") (pyim-outcome-get)))
-         (code (pyim-liberime-get-code word entered))
-         (to-be-translated
-          (string-remove-prefix code entered)))
-    (push code pyim-liberime-code-log)
-    (push word pyim-liberime-word-log)
-    (if (or (> (length to-be-translated) 0) ;是否有光标前未转换的字符串
-            (> (length (pyim-entered-get 'point-after)) 0)) ;是否有光标后字符串
-        (progn
-          (pyim-process-with-entered-buffer
-            (delete-region (point-min) (point))
-            (insert to-be-translated)
-            (goto-char (point-max)))
-          (pyim-process-run))
-      ;; 在 rime 后端造词和调整瓷瓶词频
-      (pyim-liberime-create-word
-       (reverse pyim-liberime-code-log)
-       (reverse pyim-liberime-word-log))
-      ;; 使用 rime 的同时，也附带的优化 quanpin 的词库。
-      (let ((pyim-default-scheme 'quanpin))
-        (if (member (pyim-outcome-get) (pyim-process-get-candidates))
-            (pyim-process-create-word (pyim-outcome-get) t)
-          (pyim-process-create-word (pyim-outcome-get))))
-      (setq pyim-liberime-code-log nil)
-      (setq pyim-liberime-word-log nil)
-      (pyim-process-terminate)
-      ;; pyim 使用这个 hook 来处理联想词。
-      (run-hooks 'pyim-select-finish-hook))))
-
 (defun pyim-autoselector-rime (&rest _args)
   "适用于RIME的自动上屏器."
   (let* ((scheme (pyim-scheme-current)))
@@ -216,40 +171,52 @@
 
 (add-to-list 'pyim-process-autoselector 'pyim-autoselector-rime)
 
-(defun pyim-liberime-create-word (codes words)
-  "通过 CODES 和 WORDS 的信息，在 rime 后端重新造词和调整词频。
-比如：
+(cl-defmethod pyim-page-preview-create ((_scheme pyim-scheme-rime) &optional separator)
+  (let* ((preedit (or (liberime-get-preedit)
+                      (pyim-entered-get 'point-before))))
+    (pyim-process-with-entered-buffer
+      (if (equal 1 (point))
+          (concat "|" preedit)
+        (concat (replace-regexp-in-string (concat separator "'") "'" preedit)
+                " |" (buffer-substring-no-properties (point) (point-max)))))))
 
-1. CODES -> (\"nihao\" \"ma\")
-2. WORDS -> (\"你好\" \"吗\")
+(defvar pyim-liberime-code-log nil)
+(defvar pyim-liberime-word-log nil)
+(cl-defmethod pyim-select-word-really ((_scheme pyim-scheme-rime))
+  "从选词框中选择当前词条，然后删除该词条对应拼音。"
+  (pyim-process-outcome-handle 'candidate)
+  (let* ((entered (pyim-entered-get 'point-before))
+         (word (string-remove-prefix
+                (or (pyim-outcome-get 1) "") (pyim-outcome-get)))
+         (code (pyim-liberime--get-code word entered))
+         (to-be-translated
+          (string-remove-prefix code entered)))
+    (push code pyim-liberime-code-log)
+    (push word pyim-liberime-word-log)
+    (if (or (> (length to-be-translated) 0) ;是否有光标前未转换的字符串
+            (> (length (pyim-entered-get 'point-after)) 0)) ;是否有光标后字符串
+        (progn
+          (pyim-process-with-entered-buffer
+            (delete-region (point-min) (point))
+            (insert to-be-translated)
+            (goto-char (point-max)))
+          (pyim-process-run))
+      ;; 在 rime 后端造词和调整瓷瓶词频
+      (pyim-liberime--create-word
+       (reverse pyim-liberime-code-log)
+       (reverse pyim-liberime-word-log))
+      ;; 使用 rime 的同时，也附带的优化 quanpin 的词库。
+      (let ((pyim-default-scheme 'quanpin))
+        (if (member (pyim-outcome-get) (pyim-process-get-candidates))
+            (pyim-process-create-word (pyim-outcome-get) t)
+          (pyim-process-create-word (pyim-outcome-get))))
+      (setq pyim-liberime-code-log nil)
+      (setq pyim-liberime-word-log nil)
+      (pyim-process-terminate)
+      ;; pyim 使用这个 hook 来处理联想词。
+      (run-hooks 'pyim-select-finish-hook))))
 
-在 rime 后端将生成 “你好吗” 这个词条。"
-  (when (and (listp codes)
-             (listp words)
-             (not (cl-find-if-not #'stringp codes))
-             (not (cl-find-if-not #'stringp words)))
-    (liberime-clear-composition)
-    (dolist (key (string-to-list (string-join codes)))
-      (liberime-process-key key))
-    (let (word)
-      (while (setq word (pop words))
-        (let ((status t))
-          (while status
-            (let* ((context (liberime-get-context))
-                   (menu (alist-get 'menu context))
-                   (last-page-p (alist-get 'last-page-p menu))
-                   (candidates (alist-get 'candidates menu))
-                   (pos (cl-position word candidates :test #'equal)))
-              (cond
-               (pos (liberime-select-candidate pos)
-                    (setq status nil))
-               ((or last-page-p
-                    (not menu))
-                (setq status nil)
-                (setq words nil))
-               (t (liberime-process-key 65366))))))))))
-
-(defun pyim-liberime-get-code (word input &optional _limit)
+(defun pyim-liberime--get-code (word input &optional _limit)
   "Get the code of WORD from the beginning of INPUT.
 `liberime-search' with LIMIT argument is used internal.
 
@@ -293,6 +260,39 @@ Please see: https://github.com/rime/librime/issues/349"
       (or str input)))
    ;; 找不到通用的处理方式的话就不做截取处理。
    (t input)))
+
+(defun pyim-liberime--create-word (codes words)
+  "通过 CODES 和 WORDS 的信息，在 rime 后端重新造词和调整词频。
+比如：
+
+1. CODES -> (\"nihao\" \"ma\")
+2. WORDS -> (\"你好\" \"吗\")
+
+在 rime 后端将生成 “你好吗” 这个词条。"
+  (when (and (listp codes)
+             (listp words)
+             (not (cl-find-if-not #'stringp codes))
+             (not (cl-find-if-not #'stringp words)))
+    (liberime-clear-composition)
+    (dolist (key (string-to-list (string-join codes)))
+      (liberime-process-key key))
+    (let (word)
+      (while (setq word (pop words))
+        (let ((status t))
+          (while status
+            (let* ((context (liberime-get-context))
+                   (menu (alist-get 'menu context))
+                   (last-page-p (alist-get 'last-page-p menu))
+                   (candidates (alist-get 'candidates menu))
+                   (pos (cl-position word candidates :test #'equal)))
+              (cond
+               (pos (liberime-select-candidate pos)
+                    (setq status nil))
+               ((or last-page-p
+                    (not menu))
+                (setq status nil)
+                (setq words nil))
+               (t (liberime-process-key 65366))))))))))
 
 (cl-defmethod pyim-process-terminate-really ((_scheme pyim-scheme-rime))
   (cl-call-next-method)

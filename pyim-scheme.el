@@ -45,12 +45,12 @@
 临时激活某种辅助输入法（比如：拼音输入法）来输入汉字。"
   :type 'symbol)
 
-(defvar pyim-assistant-scheme-enable nil
+(defvar pyim-scheme--enable-assistant-p nil
   "设置临时 scheme, 用于五笔等形码输入法临时拼音输入。")
 
-(pyim-register-local-variables '(pyim-assistant-scheme-enable))
+(pyim-register-local-variables '(pyim-scheme--enable-assistant-p))
 
-(defvar pyim-schemes nil
+(defvar pyim-scheme--all-schemes nil
   "Pyim 支持的所有拼音方案.")
 
 (cl-defstruct (pyim-scheme
@@ -105,7 +105,7 @@
 ;;;###autoload
 (defun pyim-default-scheme (&optional scheme-name)
   (interactive)
-  (let* ((scheme-names (mapcar #'pyim-scheme-name pyim-schemes))
+  (let* ((scheme-names (mapcar #'pyim-scheme-name pyim-scheme--all-schemes))
          (scheme-name
           (or scheme-name
               (intern (completing-read "PYIM: 将 pyim-default-scheme 设置为：" scheme-names)))))
@@ -118,7 +118,7 @@
       nil)))
 
 (defun pyim-scheme-add (scheme-config)
-  "Add SCHEME to `pyim-schemes'."
+  "Add SCHEME to `pyim-scheme--all-schemes'."
   (if (listp scheme-config)
       (let* ((scheme-name (car scheme-config))
              (scheme-type (plist-get (cdr scheme-config) :class))
@@ -132,7 +132,7 @@
              schemes update-p)
         (when (and (symbolp scheme-name)
                    (functionp func))
-          (dolist (x pyim-schemes)
+          (dolist (x pyim-scheme--all-schemes)
             (push (if (equal (pyim-scheme-name x) scheme-name)
                       (progn (setq update-p t)
                              scheme)
@@ -140,13 +140,13 @@
                   schemes))
           (unless update-p
             (push scheme schemes))
-          (setq pyim-schemes (reverse schemes))))
+          (setq pyim-scheme--all-schemes (reverse schemes))))
     (message "PYIM: Invalid pyim scheme config!")))
 
 (defun pyim-scheme-current ()
   "获取当前正在使用的 scheme。"
   (or (pyim-scheme-get
-       (if pyim-assistant-scheme-enable
+       (if pyim-scheme--enable-assistant-p
            pyim-assistant-scheme
          pyim-default-scheme))
       (pyim-scheme-get 'quanpin)))
@@ -157,7 +157,23 @@
     (cl-find-if
      (lambda (x)
        (equal (pyim-scheme-name x) scheme-name))
-     pyim-schemes)))
+     (pyim-scheme-get-all-schemes))))
+
+(defun pyim-scheme-get-all-schemes ()
+  pyim-scheme--all-schemes)
+
+(defun pyim-scheme-assistant-status ()
+  pyim-scheme--enable-assistant-p)
+
+(defun pyim-scheme-enable-assistant ()
+  (setq pyim-scheme--enable-assistant-p t))
+
+(defun pyim-scheme-disable-assistant ()
+  (setq pyim-scheme--enable-assistant-p nil))
+
+(defun pyim-scheme-toggle-assistant ()
+  (setq pyim-scheme--enable-assistant-p
+        (not pyim-scheme--enable-assistant-p)))
 
 ;; 注意：这个 quanpin scheme 在 pyim 中有特殊的作用，许多功能都依赖 quanpin
 ;; scheme 的存在，所以这个 scheme 不可以删除，也不可以更改名字。

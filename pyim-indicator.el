@@ -61,39 +61,51 @@ timer 实现。"
 
     (中文输入时显示的字符串 英文输入时显示的字符串)。")
 
-(defvar pyim-indicator-original-cursor-color nil
+(defvar pyim-indicator--original-cursor-color nil
   "记录 cursor 的原始颜色。")
 
-(defvar pyim-indicator-timer nil
+(defvar pyim-indicator--timer nil
   "`pyim-indicator-daemon' 使用的 timer.")
 
-(defvar pyim-indicator-timer-repeat 0.4)
+(defvar pyim-indicator--timer-repeat 0.4)
 
-(defvar pyim-indicator-daemon-function-argument nil
-  "实现 `pyim-indicator-daemon-function' 时，用于传递参数，主要原因
+(defvar pyim-indicator--daemon-function-argument nil
+  "实现 `pyim-indicator--daemon-function' 时，用于传递参数，主要原因
 是由于 `post-command-hook' 不支持参数。")
 
-(defvar pyim-indicator-last-input-method-title nil
+(defvar pyim-indicator--last-input-method-title nil
   "记录上一次 `current-input-method-title' 的取值。")
 
-(defun pyim-indicator-start-daemon ()
+(defun pyim-indicator--start-daemon ()
   "Indicator daemon, 用于实时显示输入法当前输入状态。"
-  (unless pyim-indicator-original-cursor-color
-    (setq pyim-indicator-original-cursor-color
+  (unless pyim-indicator--original-cursor-color
+    (setq pyim-indicator--original-cursor-color
           (frame-parameter nil 'cursor-color)))
-  (setq pyim-indicator-daemon-function-argument
+  (setq pyim-indicator--daemon-function-argument
         #'pyim-process-indicator-function)
   (if pyim-indicator-use-post-command-hook
-      (add-hook 'post-command-hook #'pyim-indicator-daemon-function)
-    (unless (timerp pyim-indicator-timer)
-      (setq pyim-indicator-timer
+      (add-hook 'post-command-hook #'pyim-indicator--daemon-function)
+    (unless (timerp pyim-indicator--timer)
+      (setq pyim-indicator--timer
             (run-with-timer
-             nil pyim-indicator-timer-repeat
-             #'pyim-indicator-daemon-function)))))
+             nil pyim-indicator--timer-repeat
+             #'pyim-indicator--daemon-function)))))
 
-(add-hook 'pyim-process-start-daemon-hook #'pyim-indicator-start-daemon)
+(add-hook 'pyim-process-start-daemon-hook #'pyim-indicator--start-daemon)
 
-(defun pyim-indicator-stop-daemon ()
+(defun pyim-indicator--daemon-function ()
+  "`pyim-indicator-daemon' 内部使用的函数。"
+  (while-no-input
+    (redisplay)
+    (ignore-errors
+      (let ((chinese-input-p
+             (and (functionp pyim-indicator--daemon-function-argument)
+                  (funcall pyim-indicator--daemon-function-argument))))
+        (dolist (indicator pyim-indicator-list)
+          (when (functionp indicator)
+            (funcall indicator current-input-method chinese-input-p)))))))
+
+(defun pyim-indicator--stop-daemon ()
   "Stop indicator daemon."
   (interactive)
   ;; 只有其它的 buffer 中没有启动 pyim 时，才停止 daemon.
@@ -102,55 +114,35 @@ timer 实现。"
            (lambda (buf)
              (buffer-local-value 'current-input-method buf))
            (remove (current-buffer) (buffer-list)))
-    (setq pyim-indicator-daemon-function-argument nil)
-    (remove-hook 'post-command-hook #'pyim-indicator-daemon-function)
-    (when (timerp pyim-indicator-timer)
-      (cancel-timer pyim-indicator-timer)
-      (setq pyim-indicator-timer nil))
-    (pyim-indicator-revert-cursor-color)))
+    (setq pyim-indicator--daemon-function-argument nil)
+    (remove-hook 'post-command-hook #'pyim-indicator--daemon-function)
+    (when (timerp pyim-indicator--timer)
+      (cancel-timer pyim-indicator--timer)
+      (setq pyim-indicator--timer nil))
+    (pyim-indicator--revert-cursor-color)))
 
-(add-hook 'pyim-process-stop-daemon-hook #'pyim-indicator-stop-daemon)
+(add-hook 'pyim-process-stop-daemon-hook #'pyim-indicator--stop-daemon)
 
-(defun pyim-indicator-daemon-function ()
-  "`pyim-indicator-daemon' 内部使用的函数。"
-  (while-no-input
-    (redisplay)
-    (ignore-errors
-      (let ((chinese-input-p
-             (and (functionp pyim-indicator-daemon-function-argument)
-                  (funcall pyim-indicator-daemon-function-argument))))
-        (dolist (indicator pyim-indicator-list)
-          (when (functionp indicator)
-            (funcall indicator current-input-method chinese-input-p)))))))
-
-(defun pyim-indicator-revert-cursor-color ()
+(defun pyim-indicator--revert-cursor-color ()
   "将 cursor 颜色重置到 pyim 启动之前的状态。"
-  (when pyim-indicator-original-cursor-color
-    (set-cursor-color pyim-indicator-original-cursor-color)))
-
-(defun pyim-indicator-update-mode-line ()
-  "更新 mode-line."
-  (unless (eq pyim-indicator-last-input-method-title
-              current-input-method-title)
-    (force-mode-line-update)
-    (setq pyim-indicator-last-input-method-title
-          current-input-method-title)))
+  (when pyim-indicator--original-cursor-color
+    (set-cursor-color pyim-indicator--original-cursor-color)))
 
 (defun pyim-indicator-with-cursor-color (input-method chinese-input-p)
   "Pyim 自带的 indicator, 通过光标颜色来显示输入状态。"
   (if (not (equal input-method "pyim"))
       ;; 大多数情况是因为用户切换 buffer, 新 buffer 中
       ;; pyim 没有启动，重置 cursor 颜色。
-      (set-cursor-color pyim-indicator-original-cursor-color)
+      (set-cursor-color pyim-indicator--original-cursor-color)
     (if chinese-input-p
         (set-cursor-color (nth 0 pyim-indicator-cursor-color))
       (set-cursor-color
        (or (nth 1 pyim-indicator-cursor-color)
-           (pyim-indicator-select-color
+           (pyim-indicator--select-color
             (list "black" "white")
-            pyim-indicator-original-cursor-color))))))
+            pyim-indicator--original-cursor-color))))))
 
-(defun pyim-indicator-select-color (colors &optional prefer-color)
+(defun pyim-indicator--select-color (colors &optional prefer-color)
   "根据背景，选择一个比较显眼的颜色。
 
 如果 PREFER-COLOR 和背景颜色差异比较大，就使用 PREFER-COLOR.
@@ -171,7 +163,15 @@ timer 实现。"
     (if chinese-input-p
         (setq current-input-method-title (nth 0 pyim-indicator-modeline-string))
       (setq current-input-method-title (nth 1 pyim-indicator-modeline-string))))
-  (pyim-indicator-update-mode-line))
+  (pyim-indicator--update-mode-line))
+
+(defun pyim-indicator--update-mode-line ()
+  "更新 mode-line."
+  (unless (eq pyim-indicator--last-input-method-title
+              current-input-method-title)
+    (force-mode-line-update)
+    (setq pyim-indicator--last-input-method-title
+          current-input-method-title)))
 
 ;; * Footer
 (provide 'pyim-indicator)
