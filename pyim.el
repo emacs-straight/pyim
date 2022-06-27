@@ -53,10 +53,6 @@
   "Pyim is a Chinese input method support quanpin, shuangpin, wubi and cangjie."
   :group 'leim)
 
-(defcustom pyim-select-finish-hook nil
-  "Pyim 选词完成时运行的 hook."
-  :type 'hook)
-
 (defcustom pyim-convert-string-at-point-hook nil
   "Hook of `pyim-convert-string-at-point'.
 
@@ -148,10 +144,9 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
           overriding-local-map)
       (list key)
     ;; (message "call with key: %S" key-or-string)
-    (pyim-process-ui-init)
     (with-silent-modifications
       (unwind-protect
-          (let ((input-string (pyim--input-method key)))
+          (let ((input-string (pyim-process-input-method key)))
             ;; (message "input-string: %s" input-string)
             (when (and (stringp input-string)
                        (> (length input-string) 0))
@@ -159,71 +154,6 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
                   (list (aref input-string 0))
                 (mapcar #'identity input-string))))
         (pyim-process-terminate)))))
-
-(defun pyim--input-method (key)
-  "`pyim--input-method' 是 `pyim-input-method' 内部使用的函数。
-
-这个函数比较复杂，作许多低层工作，但它的一个重要流程是：
-
-1. 使用函数 `read-key-sequence' 得到 key-sequence
-2. 使用函数 `lookup-key' 查询 `pyim-mode-map' 中，与上述 key-sequence 对应
-   的命令。
-3. 如果查询得到的命令是 self-insert-command 时，调用这个函数。
-4. 这个函数最终会返回需要插入到 buffer 的字符串。
-
-这个部份的代码涉及许多 emacs 低层函数，相对复杂，不容易理解，有兴
-趣的朋友可以参考 elisp 手册相关章节:
-1. Invoking the Input Method
-2. Input Methods
-3. Miscellaneous Event Input Features
-4. Reading One Event"
-  ;; Check the possibility of translating KEY.
-  ;; If KEY is nil, we can anyway start translation.
-  (if (or (integerp key) (null key))
-      ;; OK, we can start translation.
-      (let* ((echo-keystrokes 0)
-             (help-char nil)
-             (overriding-terminal-local-map pyim-mode-map)
-             (input-method-function nil)
-             (input-method-use-echo-area nil)
-             (modified-p (buffer-modified-p))
-             last-command-event last-command this-command)
-
-        (pyim-process-set-translating-flag t)
-        (pyim-process-cleanup-input-output)
-
-        (when key
-          (pyim-add-unread-command-events key))
-
-        (while (pyim-process-translating-p)
-          (set-buffer-modified-p modified-p)
-          (let* ((keyseq (read-key-sequence nil nil nil t))
-                 (cmd (lookup-key pyim-mode-map keyseq)))
-            ;; (message "key: %s, cmd:%s\nlcmd: %s, lcmdv: %s, tcmd: %s"
-            ;;          key cmd last-command last-command-event this-command)
-            (if (if key
-                    (commandp cmd)
-                  (pyim-process-self-insert-command-p cmd))
-                (progn
-                  ;; (message "keyseq: %s" keyseq)
-                  (setq last-command-event (aref keyseq (1- (length keyseq)))
-                        last-command this-command
-                        this-command cmd)
-                  (setq key t)
-                  (condition-case-unless-debug err
-                      (call-interactively cmd)
-                    (error (message "pyim 出现错误: %S , 开启 debug-on-error 后可以了解详细情况。" err)
-                           (beep))))
-              ;; KEYSEQ is not defined in the translation keymap.
-              ;; Let's return the event(s) to the caller.
-              (pyim-add-unread-command-events (this-single-command-raw-keys) t)
-              ;; (message "unread-command-events: %s" unread-command-events)
-              (pyim-process-terminate))))
-        ;; (message "return: %s" (pyim-process-get-outcome))
-        (pyim-process-get-outcome nil t t))
-    ;; Since KEY doesn't start any translation, just return it.
-    ;; But translate KEY if necessary.
-    (char-to-string key)))
 
 ;; ** Pyim 输入法注册
 ;;;###autoload
@@ -336,11 +266,8 @@ REFRESH-COMMON-DCACHE 已经废弃，不要再使用了。"
       (insert (char-to-string last-command-event)))
     (pyim-process-run))
    ((pyim-process-get-candidates)
-    (pyim-process-outcome-handle 'candidate-and-last-char)
-    (pyim-process-terminate))
-   (t
-    (pyim-process-outcome-handle 'last-char)
-    (pyim-process-terminate))))
+    (pyim-process-select-word-and-last-char))
+   (t (pyim-process-select-last-char))))
 
 (pyim-process-register-self-insert-command 'pyim-self-insert-command)
 
@@ -529,119 +456,37 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 然后再删除不需要的字，由于这个词条不是常用词条，所以
 不需要保存到个人词库。"
   (interactive)
-  (if (null (pyim-process-get-candidates))
-      (pyim-process-outcome-handle 'last-char)
-    (pyim-process-outcome-handle 'candidate))
-  (pyim-process-terminate))
+  (if (pyim-process-get-candidates)
+      (pyim-process-select-word-without-save)
+    (pyim-process-select-last-char)))
 
 (defun pyim-select-word ()
   "从选词框中选择当前词条，然后删除该词条对应拼音。"
   (interactive)
-  (pyim-process-create-code-criteria)
-  (if (null (pyim-process-get-candidates))  ; 如果没有选项，输入空格
-      (progn
-        (pyim-process-outcome-handle 'last-char)
-        (pyim-process-terminate))
-    (pyim-select-word-really (pyim-scheme-current))))
-
-(cl-defgeneric pyim-select-word-really (scheme))
-
-(cl-defmethod pyim-select-word-really ((_scheme pyim-scheme-quanpin))
-  "从选词框中选择当前词条，然后删除该词条对应拼音。"
-  (pyim-process-outcome-handle 'candidate)
-  (let* ((imobj (pyim-process-get-first-imobj))
-         (length-selected-word
-          ;; 获取 *这一次* 选择词条的长度， 在“多次选择词条才能上屏”的情况下，
-          ;; 一定要和 output 的概念作区别。
-          ;; 比如： xiaolifeidao
-          ;; 第一次选择：小李， output = 小李
-          ;; 第二次选择：飞，   output = 小李飞
-          ;; 第三次选择：刀，   output = 小李飞刀
-          (- (length (pyim-process-get-outcome))
-             (length (pyim-process-get-outcome 1))))
-         ;; pyim-imobjs 包含 *pyim-entered--buffer* 里面光标前面的字符
-         ;; 串，通过与 selected-word 做比较，获取光标前未转换的字符串。
-         ;; to-be-translated.
-         (to-be-translated
-          (string-join (mapcar (lambda (w)
-                                 (concat (nth 2 w) (nth 3 w)))
-                               (nthcdr length-selected-word imobj)))))
-    ;; 大体来说，entered 字符串可以分解为三个部分：
-
-    ;; 1. 光标前字符串
-    ;;    1. 光标前已经转换的字符串
-    ;;    2. 光标前还没有转换的字符串。
-    ;; 2. 光标后字符串
-
-    ;; 下面对 entered 字符串的大体思路是：截取已经转换的字符串，把未转
-    ;; 换的字符串和光标后的字符串合并后下一轮递归的处理。
-
-    ;; 比如：entered 为 xiaolifeidao, 本次选择 “小李” 之后，需要将
-    ;; entered 截断，“小李” 这个词条长度为2, 就将 entered从头开始缩减
-    ;; 2 个 imelem 对应的字符，变成 feidao, 为下一次选择 “飞” 做准备。
-
-    ;; 注意事项： 这里有一个假设前提是： 一个 imelem 对应一个汉字，
-    ;; 在全拼输入法中，这个假设大多数情况是成立的，但在型码输入法
-    ;; 中，比如五笔输入法，就不成立，好在型码输入法一般不需要多次
-    ;; 选择。
-    (if (and (not (pyim-process-select-subword-p)) ;以词定字的时候，不连续选择，处理起来太复杂。
-             (or (< length-selected-word (length imobj)) ;是否有未转换的光标前字符串
-                 (> (length (pyim-process-get-entered 'point-after)) 0))) ;是否有光标后字符串
-        (progn
-          (pyim-process-with-entered-buffer
-            ;; 把光标前已转换的 entered 字符串, 从 entered字符串里面剪
-            ;; 掉，保留未转换的字符串和光标之后的字符串。
-            (delete-region (point-min) (point))
-            (insert to-be-translated)
-            ;; 为下一次选词作准备，一般情况下词库里面的词条不会超过20
-            ;; 个汉字，所以这里光标向前移动不超过20个 imelem. 从而让下
-            ;; 一轮处理时的“光标前字符串”比较长，这种方式可能比逐字选
-            ;; 择更加好用。
-            (goto-char (pyim-process-next-imelem-position 20 t 1)))
-          (pyim-process-run))
-      (pyim-process-create-word (pyim-process-get-outcome) t)
-      (pyim-process-terminate)
-      ;; pyim 使用这个 hook 来处理联想词。
-      (run-hooks 'pyim-select-finish-hook))))
-
-(cl-defmethod pyim-select-word-really ((_scheme pyim-scheme-xingma))
-  "从选词框中选择当前词条，然后删除该词条对应编码。"
-  (pyim-process-outcome-handle 'candidate)
-  (if (pyim-process-with-entered-buffer
-        (and (> (point) 1)
-             (< (point) (point-max))))
-      (progn
-        (pyim-process-with-entered-buffer
-          ;; 把本次已经选择的词条对应的子 entered, 从 entered
-          ;; 字符串里面剪掉。
-          (delete-region (point-min) (point)))
-        (pyim-process-run))
-    ;; NOTE: 以词定字的时候，到底应不应该保存词条呢，需要进一步研究。
-    (pyim-process-create-word (pyim-process-get-outcome) t)
-    (pyim-process-terminate)
-    ;; pyim 使用这个 hook 来处理联想词。
-    (run-hooks 'pyim-select-finish-hook)))
+  (if (pyim-process-get-candidates)
+      (pyim-process-select-word (pyim-scheme-current))
+    ;; 如果没有选项，输入空格
+    (pyim-process-select-last-char)))
 
 (defun pyim-select-word-by-number (&optional num)
   "使用数字编号来选择对应的词条。"
   (interactive)
   (if (or pyim-select-word-by-number num)
-      (if (null (pyim-process-get-candidates))
-          (progn
-            (pyim-process-outcome-handle 'last-char)
-            (pyim-process-terminate))
-        (let ((position (pyim-page-get-candidate-position-by-numeric-key num)))
-          (when position
-            (pyim-process-set-candidate-position position)
-            (pyim-select-word))))
+      (pyim-select-word-by-number-1 num)
     ;; 有些输入法使用数字键编码，这种情况下，数字键就
     ;; 不能用来选词了。
     (call-interactively #'pyim-self-insert-command)))
 
+(defun pyim-select-word-by-number-1 (num)
+  (if (and (pyim-process-get-candidates)
+           (pyim-page-plan-to-select-word num))
+      (pyim-process-select-word (pyim-scheme-current))
+    (pyim-process-select-last-char)))
+
 (defun pyim-select-subword-by-number (&optional n)
   "以词定字功能。"
   (interactive)
-  (pyim-process-toggle-set-subword-info (or n 1))
+  (pyim-process-plan-to-select-subword-toggle (or n 1))
   (pyim-process-run))
 
 ;; ** 翻页和翻词功能
@@ -654,15 +499,13 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 (defun pyim-quit-clear ()
   "取消当前输入的命令."
   (interactive)
-  (pyim-process-outcome-handle "")
-  (pyim-process-terminate))
+  (pyim-process-select-nothing))
 
 ;; ** 字母上屏功能
 (defun pyim-quit-no-clear ()
   "字母上屏命令."
   (interactive)
-  (pyim-process-outcome-handle 'pyim-entered)
-  (pyim-process-terminate))
+  (pyim-process-select-entered))
 
 ;; ** 中英文输入模式切换
 (defalias 'pyim-toggle-input-ascii #'pyim-process-toggle-input-ascii)
@@ -674,10 +517,8 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 这个功能一般用于五笔等形码输入法，在忘记编码的时候临时用拼音输入
 中文。"
   (interactive)
-  (if (= (length (pyim-process-get-entered 'point-before)) 0)
-      (progn
-        (pyim-process-outcome-handle 'last-char)
-        (pyim-process-terminate))
+  (if (pyim-process-without-entered-p)
+      (pyim-process-select-last-char)
     (pyim-scheme-toggle-assistant)
     (pyim-process-run)))
 
@@ -686,16 +527,14 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
   "光标前移"
   (interactive)
   (pyim-process-with-entered-buffer
-    (ignore-errors
-      (forward-char)))
+    (forward-char))
   (pyim-process-run))
 
 (defun pyim-backward-point ()
   "光标后移"
   (interactive)
   (pyim-process-with-entered-buffer
-    (ignore-errors
-      (backward-char)))
+    (backward-char))
   (pyim-process-run))
 
 (defun pyim-backward-imelem (&optional search-forward)
@@ -731,12 +570,10 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
   "向后删除1个字符"
   (interactive)
   (pyim-process-with-entered-buffer
-    (ignore-errors
-      (delete-char (- 0 (or n 1)))))
-  (if (> (length (pyim-process-get-entered 'point-before)) 0)
-      (pyim-process-run)
-    (pyim-process-outcome-handle "")
-    (pyim-process-terminate)))
+    (delete-char (- 0 (or n 1))))
+  (if (pyim-process-without-entered-p)
+      (pyim-process-select-nothing)
+    (pyim-process-run)))
 
 (defun pyim-delete-forward-char ()
   "向前删除1个字符"
