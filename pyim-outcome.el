@@ -99,7 +99,7 @@ pyim 使用函数 `pyim-process-select-handle-char' 来处理特殊功能触发�
 光标前面的文字内容。"
   :type 'function)
 
-(defvar pyim-outcome-history nil
+(defvar pyim-outcome--history nil
   "记录 pyim outcome 的变化的历史
 
 在 pyim 中 outcome 代表用户通过输入法选择，并最终插入到 buffer
@@ -119,29 +119,33 @@ pyim 使用函数 `pyim-process-select-handle-char' 来处理特殊功能触发�
 5. 第三次选择：四
 6. 变量取值为： (\"一二三四\" \"一二三\" \"一二\")")
 
-(defvar pyim-outcome-subword-info nil
-  "在以词定字功能中，用来保存字的位置。")
-
 (defvar pyim-outcome--magic-convert-cache nil
   "用来临时保存 `pyim-outcome-magic-convert' 的结果.
 从而加快同一个字符串第二次的转换速度。")
 
-(pyim-register-local-variables '(pyim-outcome-history))
+(pyim-register-local-variables '(pyim-outcome--history))
 
 ;; ** 选词框相关函数
-(defun pyim-outcome-get (&optional n)
+(defun pyim-outcome-get ()
   "获取 outcome"
-  (nth (or n 0) pyim-outcome-history))
+  (pyim-outcome--get 0))
 
-(defun pyim-outcome-get-subword (word)
-  "根据 `pyim-outcome-subword-info' 的信息，获取 WORD 的一个子词条。"
-  (if pyim-outcome-subword-info
-      (let (output)
-        (dolist (i (sort pyim-outcome-subword-info #'>))
-          (when (<= i (length word))
-            (push (substring word (- i 1) i) output)))
-        (string-join output))
-    word))
+(defun pyim-outcome--get (n)
+  "获取 outcome"
+  (nth n pyim-outcome--history))
+
+(defun pyim-outcome-add (outcome)
+  "添加 OUTCOME."
+  (push outcome pyim-outcome--history))
+
+(defun pyim-outcome-diff ()
+  "OUTCOME 的变化。"
+  (string-remove-prefix
+   (or (pyim-outcome--get 1) "") (pyim-outcome--get 0)))
+
+(defun pyim-outcome-erase ()
+  "清除 OUTCOME."
+  (setq pyim-outcome--history nil))
 
 (defun pyim-outcome-magic-convert (str)
   "用于处理 `pyim-outcome-magic-converter' 的函数。"
