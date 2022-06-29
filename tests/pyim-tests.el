@@ -374,6 +374,12 @@
                      ("f" "en" "h" "eng"))))))
 
 ;; ** pyim-punctuation 相关单元测试
+(ert-deftest pyim-tests-pyim-punctuation-p ()
+  (should (pyim-punctuation-p ?,))
+  (should (pyim-punctuation-p ?，))
+  (should-not (pyim-punctuation-p ?a))
+  (should-not (pyim-punctuation-p ?1)))
+
 (ert-deftest pyim-tests-pyim-punctuation ()
   (with-temp-buffer
     (insert ",")
@@ -412,8 +418,8 @@
 
   (let ((pyim-punctuation--pair-status
          '(("\"" nil) ("'" nil))))
-    (should (equal (pyim-punctuation-return-proper-punct '("'" "‘" "’")) "‘"))
-    (should (equal (pyim-punctuation-return-proper-punct '("'" "‘" "’")) "’"))))
+    (should (equal (pyim-punctuation--return-proper-punct '("'" "‘" "’")) "‘"))
+    (should (equal (pyim-punctuation--return-proper-punct '("'" "‘" "’")) "’"))))
 
 ;; ** pyim-entered 相关单元测试
 (ert-deftest pyim-tests-pyim-entered ()
@@ -426,6 +432,28 @@
   (should (equal (pyim-entered-get 'point-after) "hao"))
   (pyim-entered-erase-buffer)
   (should (equal (pyim-entered-get) "")))
+
+(ert-deftest pyim-tests-pyim-entered-in-the-middle-of-entered-p ()
+  (pyim-entered-with-entered-buffer
+    (erase-buffer)
+    (insert "nihao")
+    (goto-char (point-min)))
+  (should-not (pyim-entered-in-the-middle-of-entered-p))
+
+  (pyim-entered-with-entered-buffer
+    (forward-char 1))
+  (should (pyim-entered-in-the-middle-of-entered-p))
+
+  (pyim-entered-with-entered-buffer
+    (goto-char (point-max)))
+  (should-not (pyim-entered-in-the-middle-of-entered-p))
+
+  (pyim-entered-with-entered-buffer
+    (backward-char 1))
+  (should (pyim-entered-in-the-middle-of-entered-p))
+
+  ;; Do not delete.
+  (pyim-entered-erase-buffer))
 
 ;; ** pyim-impobjs 相关单元测试
 (ert-deftest pyim-tests-pyim-imobjs ()
@@ -2168,6 +2196,39 @@ abc 这是")))
     (should (equal (pyim-process-next-word-position -3) 0))
 
     (should (equal (pyim-process-next-word-position -4) 10))))
+
+(ert-deftest pyim-tests-pyim-process--trigger-delete-word-p ()
+  (let ((pyim-default-scheme 'quanpin))
+    (with-temp-buffer
+      (insert "你好2-")
+      (should (pyim-process--trigger-delete-word-p)))))
+
+(ert-deftest pyim-tests-pyim-process--trigger-create-word-p ()
+  (let ((pyim-default-scheme 'quanpin))
+    (with-temp-buffer
+      (insert "你好2")
+      (should (pyim-process--trigger-create-word-p)))))
+
+(ert-deftest pyim-tests-pyim-process--trigger-call-function-p ()
+  (let ((pyim-default-scheme 'quanpin))
+    (with-temp-buffer
+      (insert "你好")
+      (should (pyim-process--trigger-call-function-p)))
+    (with-temp-buffer
+      (insert "你好，")
+      (should-not (pyim-process--trigger-call-function-p)))))
+
+(ert-deftest pyim-tests-pyim-process--trigger-punctuation-to-full-width-p ()
+  (let ((pyim-default-scheme 'quanpin))
+    (with-temp-buffer
+      (insert ",")
+      (should (pyim-process--trigger-punctuation-to-full-width-p)))))
+
+(ert-deftest pyim-tests-pyim-process--trigger-punctuation-to-half-width-p ()
+  (let ((pyim-default-scheme 'quanpin))
+    (with-temp-buffer
+      (insert "，")
+      (should (pyim-process--trigger-punctuation-to-half-width-p)))))
 
 
 (ert-run-tests-batch-and-exit)

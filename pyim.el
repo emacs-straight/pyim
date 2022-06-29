@@ -132,6 +132,9 @@ Tip: 用户也可以利用 `pyim-outcome-trigger-function-default' 函数
     map)
   "Pyim 的 Keymap.")
 
+(cl-defmethod pyim-process-get-mode-map ()
+  pyim-mode-map)
+
 ;; ** pyim 输入法定义
 (defun pyim-input-method (key)
   "得到需要插入到 buffer 的字符串, 并将其插入到待输入 buffer.
@@ -271,15 +274,8 @@ REFRESH-COMMON-DCACHE 已经废弃，不要再使用了。"
 (pyim-process-register-self-insert-command 'pyim-self-insert-command)
 
 ;; ** 加词功能
-(defun pyim-create-word-at-point (&optional number silent)
-  "将光标前字符数为 NUMBER 的中文字符串添加到个人词库中，当
-SILENT 设置为 t 是，不显示提醒信息。"
-  (let ((string (pyim-cstring-at-point (or number 2)))
-        output)
-    (when string
-      (setq output (pyim-process-create-word string))
-      (unless silent
-        (message "将词条: %S 加入 personal 缓冲。" output)))))
+(defalias 'pyim-create-word-at-point
+  #'pyim-process-create-word-at-point)
 
 (defun pyim-create-2cchar-word-at-point ()
   "将光标前2个中文字符组成的字符串加入个人词库。"
@@ -418,14 +414,8 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
       (pyim-process-delete-word word)
       (message "pyim: 从个人词库中删除词条 “%s” !" word))))
 
-(defun pyim-delete-word-at-point (&optional number silent)
-  "将光标前字符数为 NUMBER 的中文字符串从个人词库中删除
-当 SILENT 设置为 t 是，不显示提醒信息。"
-  (let ((string (pyim-cstring-at-point (or number 2))))
-    (when string
-      (pyim-process-delete-word string)
-      (unless silent
-        (message "词条: \"%s\" 已经从个人词库缓冲中删除。" string)))))
+(defalias 'pyim-delete-word-at-point
+  #'pyim-process-delete-word-at-point)
 
 (defun pyim-delete-word ()
   "从个人词库中删除词条。"
