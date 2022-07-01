@@ -292,8 +292,10 @@ REFRESH-COMMON-DCACHE 已经废弃，不要再使用了。"
         (if (not (string-match-p "^\\cc+\\'" string))
             (error "不是纯中文字符串")
           (setq output (pyim-process-create-word string))
-          (message "将词条: %S 插入 personal file。" output))))
-    (deactivate-mark)))
+          (message "将词条: %S 插入 personal file。" output)))
+      (deactivate-mark)
+      ;; NOTE: 这里必须返回 t, 因为这个函数的返回结果会被用来做为判断条件。
+      t)))
 
 ;; ** 导入词条功能
 (defun pyim-import-words-and-counts (file &optional merge-method silent)
@@ -577,56 +579,16 @@ FILE 的格式与 `pyim-dcache-export' 生成的文件格式相同，
 (defun pyim-convert-string-at-point (&optional _)
   "将光标前的用户输入的字符串转换为中文."
   (interactive "P")
+  (pyim--activate-pyim)
+  (or (pyim-create-word-from-selection)
+      (pyim-process-trigger-feature-run-p)
+      (pyim-process-feed-entered-at-point-into-pyim)
+      (message "PYIM: `pyim-convert-string-at-point' did nothing.")))
+
+(defun pyim--activate-pyim ()
+  "如果当前输入法设置为 pyim, 就激活它。"
   (unless (equal input-method-function 'pyim-input-method)
-    (activate-input-method 'pyim))
-  (let ((string (pyim--string-at-region-or-point)))
-    (cond
-     ((region-active-p) (pyim-create-word-from-selection))
-     ((pyim-process-trigger-feature-run-p) nil)
-     ((pyim--find-code string) (pyim--convert-string string))
-     (t (message "Pyim: pyim-convert-string-at-point did nothing.")))))
-
-(defun pyim--string-at-region-or-point ()
-  (if mark-active
-      (buffer-substring-no-properties
-       (region-beginning) (region-end))
-    (buffer-substring (point) (line-beginning-position))))
-
-(defun pyim--find-code (string)
-  "从 STRING 末尾提取一个有效的 code."
-  (let* ((case-fold-search nil)
-         (scheme (pyim-scheme-current))
-         (first-chars (pyim-scheme-first-chars scheme))
-         (rest-chars (pyim-scheme-rest-chars scheme)))
-    (when (string-match
-           ;; 创建一个 regexp, 用于提取出光标处一个适合
-           ;; 转换的字符串。
-           (format "[%s]+ *$"
-                   (cl-delete-duplicates
-                    (concat first-chars rest-chars "'-")))
-           string)
-      (let* ((code (replace-regexp-in-string
-                    ;; 一些编程语言使用单引号做为字符串的标记，这里需要特殊处理。
-                    "^[-']" ""
-                    (match-string 0 string)))
-             (length (length code))
-             (code (replace-regexp-in-string " +" "" code)))
-        (list code length)))))
-
-(defun pyim--convert-string (string)
-  (let* ((code-info-at-point (pyim--find-code string))
-         (code (nth 0 code-info-at-point))
-         (char-num-need-delete
-          (nth 1 code-info-at-point)))
-    (when mark-active
-      (delete-region
-       (region-beginning) (region-end)))
-    (when (and (not mark-active)
-               (> char-num-need-delete 0))
-      (backward-delete-char char-num-need-delete))
-    (when (> (length code) 0)
-      (pyim-add-unread-command-events code)
-      (pyim-process-force-input-chinese))))
+    (activate-input-method 'pyim)))
 
 ;; ** 编码反查功能
 (defun pyim-search-word-code ()
