@@ -43,16 +43,20 @@
   :group 'pyim)
 
 (defcustom pyim-dcache-backend 'pyim-dhashcache
-  "词库后端引擎.负责缓冲词库并提供搜索词的算法.
-可选项为 `pyim-dhashcache' 或 `pyim-dregcache'.
-前者搜索单词速度很快,消耗内存多.  后者搜索单词速度较快,消耗内存少.
+  "词库后端引擎，负责缓冲词库并提供搜索词条的算法。
 
-`pyim-dregcache' 速度和词库大小成正比.  当词库接近100M大小时,
-在六年历史的笔记本上会有一秒的延迟. 这时建议换用 `pyim-dhashcache'.
+目前有两个选项：
 
-注意事项：
-1. `pyim-dregcache' 只支持全拼和双拼输入法，不支持其它型码输入法。
-2. 如果使用这个后端，用户需要： (require \\='pyim-dregcache)."
+1. `pyim-dhashcache'
+2. `pyim-dregcache'
+
+`pyim-dhashcache' 是 pyim 默认使用的后端，使用 hashtable 实现，搜
+索词条速度很快，但消耗内存多。
+
+`pyim-dregcache' 消耗内存少，搜索速度和词库大小成反比，当词库小于
+100M 时，速度还可以，可以尝试，需要注意的是，这个后端只支持全拼和
+双拼输入法，不支持型码输入法，如果使用这个后端，用户需要自己在
+Emacs 配置中添加 (require \\='pyim-dregcache)."
   :type 'symbol)
 
 (defvar pyim-dcache-auto-update t
@@ -64,9 +68,9 @@
 一般不建议将这个变量设置为 nil，除非有以下情况：
 
 1. 用户的词库已经非常稳定，并且想通过禁用这个功能来降低
-pyim 对资源的消耗。
+   pyim 对资源的消耗。
 2. 自动更新功能无法正常工作，用户通过手工从其他机器上拷贝
-dcache 文件的方法让 pyim 正常工作。")
+   dcache 文件的方法让 pyim 正常工作。")
 
 ;; ** Dcache 变量初始化相关函数
 (defmacro pyim-dcache-init-variable (variable &optional fallback-value)
@@ -214,8 +218,7 @@ dcache.
 (cl-defgeneric pyim-dcache-insert-word (word code prepend)
   "将词条 WORD 插入到 dcache 中。
 
-如果 PREPEND 为 non-nil, 词条将放到已有词条的最前面。
-内部函数会根据 CODE 来确定插入对应的 hash key.")
+如果 PREPEND 为 non-nil, 词条将放到 CODE 已有对应词条的最前面。")
 
 ;; ** Dcache 删词功能
 (cl-defgeneric pyim-dcache-delete-word (word)
