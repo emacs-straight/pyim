@@ -106,7 +106,8 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
   (let ((char-level-num
          (pyim-cregexp--char-level-num char-level-num))
         rx-string)
-    (while (not (pyim-cregexp--valid-p rx-string))
+    (while (and (not (pyim-cregexp--valid-p rx-string))
+                (> char-level-num 0))
       (setq rx-string
             (pyim-cregexp--create-beautiful-cregexp-from-string
              string scheme char-level-num chinese-only))
@@ -141,6 +142,7 @@ regexp, 所以搜索单字的时候一般可以搜到生僻字，但搜索句子
                 (xr (pyim-cregexp--create-cregexp-from-string
                      x scheme char-level-num chinese-only))
               x))
+          ;; FIXME: (xr "ni\\hao") 结果应该是 ni\\hao, 但实际是 nihao.
           (xr string))))
       string))
 

@@ -922,6 +922,11 @@
       (should (equal (buffer-substring (point-min) (point)) "哈哈")))))
 
 ;; ** pyim-cregexp 相关单元测试
+(ert-deftest pyim-tests-pyim-cregexp--valid-p ()
+  (should-not (pyim-cregexp--valid-p "\\"))
+  (should (pyim-cregexp--valid-p "\\\\"))
+  (should (pyim-cregexp--valid-p "a")))
+
 (ert-deftest pyim-tests-pyim-cregexp--find-scheme ()
   (should-not (pyim-cregexp--find-scheme nil))
   (should (equal (pyim-scheme-name (pyim-cregexp--find-scheme 'wubi)) 'wubi))
@@ -948,6 +953,13 @@
     (should (equal (pyim-scheme-name (pyim-cregexp--scheme)) 'quanpin))))
 
 (ert-deftest pyim-tests-pyim-cregexp ()
+  ;; FIXME: 这个 test 有问题，以后需要更新。
+  (let ((regexp (pyim-cregexp-build "ni\\hao")))
+    (should (string-match-p regexp "nihao"))
+    (should (string-match-p regexp "anihaob"))
+    (should (string-match-p regexp "你好"))
+    (should (string-match-p regexp "哈哈你好吗")))
+
   (let ((regexp (pyim-cregexp-build "nihao")))
     (should (string-match-p regexp "nihao"))
     (should (string-match-p regexp "anihaob"))
