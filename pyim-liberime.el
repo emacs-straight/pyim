@@ -200,7 +200,7 @@
             (insert to-be-translated)
             (goto-char (point-max)))
           (pyim-process-run))
-      ;; 在 rime 后端造词和调整瓷瓶词频
+      ;; 在 rime 后端造词和调整词频
       (pyim-liberime--create-word
        (reverse pyim-liberime-code-log)
        (reverse pyim-liberime-word-log))
@@ -212,6 +212,10 @@
       (setq pyim-liberime-code-log nil)
       (setq pyim-liberime-word-log nil)
       (pyim-process-terminate))))
+
+(cl-defmethod pyim-cstring-to-codes (string (_scheme pyim-scheme-rime) &optional criteria)
+  "将中文字符串 STRING 转换为对应的拼音。"
+  (pyim-cstring-to-codes string (pyim-scheme-get 'quanpin) criteria))
 
 (defun pyim-liberime--get-code (word input &optional _limit)
   "Get the code of WORD from the beginning of INPUT.
