@@ -37,24 +37,6 @@
   "Chinese string tools for pyim."
   :group 'pyim)
 
-(defun pyim-cstring--partition (string &optional to-cchar)
-  "STRING partition.
-
-1. Hello你好 -> (\"Hello\" \"你\" \"好\"), when TO-CCHAR is non-nil.
-2. Hello你好 -> (\"Hello\" \"你好\"), when TO-CCHAR is nil."
-  ;; NOTE: 使用5个\0作为分割符有没有其它副作用？有待观察。
-  (let ((sep (make-string 5 ?\0)))
-    (if (pyim-string-match-p "\\CC" string)
-        ;; 处理中英文混合的情况
-        (remove "" (split-string
-                    (replace-regexp-in-string
-                     (if to-cchar "\\(\\cc\\)" "\\(\\cc+\\)")
-                     (concat sep "\\1" sep) string)
-                    sep))
-      (if to-cchar
-          (cl-mapcar #'char-to-string string)
-        (list string)))))
-
 (defun pyim-cstring--substrings (cstring &optional max-length number)
   "找出 CSTRING 中所有长度不超过 MAX-LENGTH 的子字符串，生成一个 alist。
 
@@ -98,68 +80,55 @@ NUMBER 用于递归，表示子字符串在 CSTRING 中的位置。"
 ;; ** 中文字符串到拼音的转换工具
 ;;;###autoload
 (defun pyim-cstring-to-pinyin (string &optional shou-zi-mu separator
-                                      return-list ignore-duo-yin-zi adjust-duo-yin-zi)
+                                      return-list ignore-duo-yin-zi _)
   "将汉字字符串转换为对应的拼音字符串的工具.
 
 如果 SHOU-ZI-MU 设置为 t, 转换仅得到拼音首字母字符串。当
 RETURN-LIST 设置为 t 时，返回一个拼音列表，这个列表包含词条的一个
 或者多个拼音（词条包含多音字时）；如果 IGNORE-DUO-YIN-ZI 设置为
-t, 遇到多音字时，只使用第一个拼音，其它拼音忽略；当
-ADJUST-DUO-YIN-Zi 设置为 t 时, `pyim-cstring-to-pinyin' 会使用 pyim 已
-安装的词库来校正多音字，但这个功能有一定的限制:
-
-1. pyim 普通词库中不存在的词条不能较正
-2. 多音字校正速度比较慢，实时转换会产生卡顿。
+t, 遇到多音字时，只使用第一个拼音，其它拼音忽略。
 
 BUG: 当 STRING 中包含其它标点符号，并且设置 SEPERATER 时，结果会
 包含多余的连接符：比如： \"你=好\" --> \"ni-=-hao\""
   (if (not (pyim-string-match-p "\\cc" string))
-      (if return-list
-          (list string)
-        string)
-    (let (pinyins-list pinyins-list-adjusted)
-      ;; ("Hello" "银" "行") -> (("Hello") ("yin") ("hang" "xing"))
-      (setq pinyins-list
-            (mapcar (lambda (str)
-                      (if (pyim-string-match-p "\\cc" str)
-                          (pyim-pymap-cchar2py-get str)
-                        (list str)))
-                    (pyim-cstring--partition string t)))
-
-      ;; 通过排列组合的方式, 重排 pinyins-list。
-      ;; 比如：(("Hello") ("yin") ("hang" "xing")) -> (("Hello" "yin" "hang") ("Hello" "yin" "xing"))
-      (setq pinyins-list
-            (pyim-permutate-list pinyins-list))
-
-      ;; 使用 pyim 的安装的词库来校正多音字。
-      ;; FIXME：如果 string 包含非中文的字符，那么多音字矫正将不起作用。
-      (when adjust-duo-yin-zi
-        (pyim-dcache-init-variables)
-        (dolist (pylist pinyins-list)
-          (let* ((py-str (mapconcat #'identity pylist "-"))
-                 (words-from-dicts
-                  (pyim-dcache-get py-str '(code2word))))
-            (when (member string words-from-dicts)
-              (push pylist pinyins-list-adjusted))))
-        (setq pinyins-list-adjusted
-              (nreverse pinyins-list-adjusted)))
-
+      (if return-list (list string) string)
+    (let* ((pinyins-list
+            (or (pyim-cstring-to-pinyin--from-dcache string)
+                (pyim-pymap-str2py-get string)))
+           (list (mapcar (lambda (x)
+                           (mapconcat (lambda (str)
+                                        (if shou-zi-mu
+                                            (substring str 0 1)
+                                          str))
+                                      x separator))
+                         (if ignore-duo-yin-zi
+                             (list (car pinyins-list))
+                           pinyins-list))))
       ;; 返回拼音字符串或者拼音列表
-      (let* ((pinyins-list
-              (or pinyins-list-adjusted
-                  pinyins-list))
-             (list (mapcar (lambda (x)
-                             (mapconcat (lambda (str)
-                                          (if shou-zi-mu
-                                              (substring str 0 1)
-                                            str))
-                                        x separator))
-                           (if ignore-duo-yin-zi
-                               (list (car pinyins-list))
-                             pinyins-list))))
-        (if return-list
-            list
-          (string-join list " "))))))
+      (if return-list
+          list
+        (string-join list " ")))))
+
+(defun pyim-cstring-to-pinyin--from-dcache (cstring)
+  "从 Dcache 中搜索 CSTRING 对应的拼音。"
+  (let* ((pinyins-list
+          (mapcar #'pyim-cstring--get-pinyin-code
+                  (pyim-pymap-split-string cstring))))
+    (unless (member nil pinyins-list)
+      (list (apply #'append pinyins-list)))))
+
+(defun pyim-cstring--get-pinyin-code (str)
+  "从 Dcache 中获取中文字符串 STR 对应的拼音。
+
+如果 STR 不包含中文，不做特殊处理。"
+  (if (pyim-string-match-p "\\cc" str)
+      (when-let ((code (cl-find-if-not
+                        (lambda (c)
+                          ;; 注意：Pinyin 词库中不包含 "/" 字符。
+                          (string-match-p c "/"))
+                        (pyim-dcache-get str '(word2code)))))
+        (split-string code "-"))
+    (list str)))
 
 ;;;###autoload
 (defun pyim-cstring-to-pinyin-simple (string &optional shou-zi-mu separator return-list)

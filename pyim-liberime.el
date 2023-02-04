@@ -295,6 +295,25 @@ Please see: https://github.com/rime/librime/issues/349"
                 (setq words nil))
                (t (liberime-process-key 65366))))))))))
 
+(defun pyim-liberime-create-word (word &rest _)
+  "将 WORD 添加到 RIME 数据库中。
+
+这个函数仅用于 rime-quanpin scheme."
+  (when-let* ((rime-quanpin-p
+               (equal (pyim-scheme-name (pyim-scheme-current))
+                      'rime-quanpin))
+              (chars (remove "" (split-string word "")))
+              (codes-list
+               (mapcar (lambda (x)
+                         (split-string x "-"))
+                       (pyim-cstring-to-pinyin word nil "-" t nil t))))
+    (dolist (codes codes-list)
+      (pyim-liberime--create-word codes chars))
+    (liberime-clear-commit)
+    (liberime-clear-composition)))
+
+(advice-add 'pyim-process-create-word :after #'pyim-liberime-create-word)
+
 (cl-defmethod pyim-process-terminate-really ((_scheme pyim-scheme-rime))
   (cl-call-next-method)
   (liberime-clear-commit)

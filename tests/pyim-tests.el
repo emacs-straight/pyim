@@ -199,6 +199,12 @@
                  '("a-b-c-d" "a-b-c" "a-b")))
   (should (equal (pyim-subconcat nil) nil)))
 
+(ert-deftest pyim-tests-pyim-split-list ()
+  (should (equal (pyim-split-list '(a b sep c d) 'sep)
+                 '((a b) (c d))))
+  (should (equal (pyim-split-list '(sep b sep c sep) 'sep)
+                 '(nil (b) (c) nil))))
+
 (ert-deftest pyim-tests-pyim-string-distance ()
   (should (equal (pyim-string-distance "nihaoma" "nihaoma") 0))
   (should (equal (pyim-string-distance "nihaoma" "nhm") 4))
@@ -269,6 +275,26 @@
   (should (pyim-numbers> '(2) '(1 3))))
 
 ;; ** pyim-pymap 相关单元测试
+(ert-deftest pyim-tests-pyim-pymap-split-string ()
+  (should (equal (pyim-pymap-split-string "你好 hello 你好")
+                 '("你好" " hello " "你好")))
+  (should (equal (pyim-pymap-split-string "hello 你好 hello 你好 hello")
+                 '("hello " "你好" " hello " "你好" " hello")))
+  (should (equal (pyim-pymap-split-string "你好 hello 你好@")
+                 '("你好" " hello " "你好" "@")))
+  (should (equal (pyim-pymap-split-string "你好 hello 你好，你好")
+                 '("你好" " hello " "你好" "，" "你好")))
+  (should (equal (pyim-pymap-split-string "你好 hello 你好" t)
+                 '("你" "好" " hello " "你" "好")))
+  (should (equal (pyim-pymap-split-string "你好")
+                 '("你好")))
+  (should (equal (pyim-pymap-split-string "你好" t)
+                 '("你" "好")))
+  (should (equal (pyim-pymap-split-string "hello")
+                 '("hello")))
+  (should (equal (pyim-pymap-split-string "hello" t)
+                 '("hello"))))
+
 (ert-deftest pyim-tests-pyim-pymap ()
   (should-not (cl-find-if-not
                (lambda (x)
@@ -291,6 +317,21 @@
                  '("阿" "啊" "呵" "腌" "|" "嗄" "吖" "锕" "|" "|" "錒")))
   (should (equal (pyim-pymap-py2cchar-get "zhua" t)
                  '("抓挝爪||髽|膼撾檛簻")))
+  (should (equal (pyim-pymap--py2duoyinzi-get "a")
+                 '("吖啶" "腌臜")))
+  (should (pyim-pymap-duoyinzi-include-p "银行"))
+  (should-not (pyim-pymap-duoyinzi-include-p "银子"))
+  (should (equal (pyim-pymap--py2duoyinzi-get "ai" t)
+                 '("艾")))
+
+  (should (equal (pyim-pymap-str2py-get '"hello你好ma")
+                 '(("hello" "ni" "hao" "ma"))))
+
+  (should (equal (pyim-pymap-str2py-get '"hello你鹢ma")
+                 '(("hello" "ni" "yi" "ma")
+                   ("hello" "ni" "ni" "ma")
+                   ("hello" "ni" "hua" "ma"))))
+
   (should (equal (mapcar (lambda (x)
                            (concat (substring x 0 1)
                                    (substring x -1)))
@@ -714,20 +755,6 @@
       (should (equal (get-text-property 0 :comment (car words)) "(buf)")))))
 
 ;; ** pyim-cstring 相关单元测试
-(ert-deftest pyim-tests-pyim-cstring--partition ()
-  (should (equal (pyim-cstring--partition "你好 hello 你好")
-                 '("你好" " hello " "你好")))
-  (should (equal (pyim-cstring--partition "你好 hello 你好" t)
-                 '("你" "好" " hello " "你" "好")))
-  (should (equal (pyim-cstring--partition "你好")
-                 '("你好")))
-  (should (equal (pyim-cstring--partition "你好" t)
-                 '("你" "好")))
-  (should (equal (pyim-cstring--partition "hello")
-                 '("hello")))
-  (should (equal (pyim-cstring--partition "hello" t)
-                 '("hello"))))
-
 (ert-deftest pyim-tests-pyim-cstring--substrings ()
   (should (equal (pyim-cstring--substrings "我爱北京")
                  '(("我爱北京" 0 4)
@@ -791,38 +818,57 @@
                    "我爱-北京-天安-门"))))
 
 (ert-deftest pyim-tests-pyim-cstring-to-pinyin ()
-  (let ((pyim-dhashcache-code2word (make-hash-table :test #'equal))
-        (str "银行很行"))
-    ;; Create code2word dcache.
-    (puthash "yin-hang-hen-xing" (list "银行很行") pyim-dhashcache-code2word)
-    ;; pyim-cstring-split-to-list
-    (should (equal (pyim-cstring-to-pinyin "银行很行")
-                   (concat "yinxinghenxing yinxinghenheng yinxinghenhang "
-                           "yinhenghenxing yinhenghenheng yinhenghenhang "
-                           "yinhanghenxing yinhanghenheng yinhanghenhang")))
-    (should (equal (pyim-cstring-to-pinyin "银行很行" t)
-                   "yxhx yxhh yxhh yhhx yhhh yhhh yhhx yhhh yhhh"))
-    (should (equal (pyim-cstring-to-pinyin "银行很行" nil "-")
-                   (concat "yin-xing-hen-xing yin-xing-hen-heng yin-xing-hen-hang "
-                           "yin-heng-hen-xing yin-heng-hen-heng yin-heng-hen-hang "
-                           "yin-hang-hen-xing yin-hang-hen-heng yin-hang-hen-hang")))
-    (should (equal (pyim-cstring-to-pinyin "银行很行" nil "-" t)
-                   '("yin-xing-hen-xing" "yin-xing-hen-heng" "yin-xing-hen-hang"
-                     "yin-heng-hen-xing" "yin-heng-hen-heng" "yin-heng-hen-hang"
-                     "yin-hang-hen-xing" "yin-hang-hen-heng" "yin-hang-hen-hang")))
-    (should (equal (pyim-cstring-to-pinyin "银行很行" nil "-" t t)
-                   '("yin-xing-hen-xing")))
-    (should (equal (pyim-cstring-to-pinyin "银行很行" nil "-" nil nil t)
-                   "yin-hang-hen-xing"))
-    (should (equal (pyim-cstring-to-pinyin "Hello 银行很行 Hi" nil "-" nil t)
-                   "Hello -yin-xing-hen-xing- Hi"))
-    ;; FIXME: 这个 test 是不合理的，不过暂时找不到简单的修复方式。
-    (should (equal (pyim-cstring-to-pinyin "Hello 银行很行 Hi" nil "-" nil nil t)
-                   (concat "Hello -yin-xing-hen-xing- Hi Hello -yin-xing-hen-heng- Hi "
-                           "Hello -yin-xing-hen-hang- Hi Hello -yin-heng-hen-xing- Hi "
-                           "Hello -yin-heng-hen-heng- Hi Hello -yin-heng-hen-hang- Hi "
-                           "Hello -yin-hang-hen-xing- Hi Hello -yin-hang-hen-heng- Hi "
-                           "Hello -yin-hang-hen-hang- Hi")))))
+
+  (should (equal (pyim-pymap--possible-cchar-pinyin
+                  '("xing" "hang") '("银行"))
+                 "hang"))
+  (should-not (pyim-pymap--possible-cchar-pinyin
+               '("xing" "hang") '("不行" "行为")))
+
+  (should (equal (pyim-pymap--possible-cchar-pinyin
+                  '("bu" "pi") '("不") t)
+                 "bu"))
+
+  (should (equal (pyim-pymap--adjust-duoyinzi
+                  '("银" "行" "传" "说")
+                  '(("yin") ("xing" "heng" "hang")
+                    ("zhuan" "chuan") ("yue" "shuo" "shui")))
+                 '(("yin") ("hang") ("chuan") ("shuo"))))
+
+  (should (equal (pyim-pymap--adjust-duoyinzi
+                  '("银" "行" "很" "行")
+                  '(("yin") ("xing" "heng" "hang")
+                    ("hen") ("xing" "heng" "hang")))
+                 '(("yin") ("hang") ("hen") ("xing"))))
+
+  (should (equal (pyim-pymap--adjust-duoyinzi
+                  '("银" "行" "行" "业" "很" "行"
+                    "不" "行" "也" "行"
+                    "行" "也" "行")
+                  '(("yin") ("xing" "heng" "hang")
+                    ("xing" "heng" "hang") ("ye")
+                    ("hen") ("xing" "heng" "hang")
+                    ("dun" "bu") ("xing" "heng" "hang")
+                    ("ye") ("xing" "heng" "hang")
+                    ("xing" "heng" "hang") ("ye")
+                    ("xing" "heng" "hang")))
+                 '(("yin") ("hang") ("hang")
+                   ("ye") ("hen") ("xing")
+                   ("bu") ("xing") ("ye")
+                   ("xing") ("xing")
+                   ("ye") ("xing"))))
+
+  ;; pyim-cstring-split-to-list
+  (should (equal (pyim-cstring-to-pinyin "银行传说") "yinhangchuanshuo"))
+  (should (equal (pyim-cstring-to-pinyin "银行传说" t) "yhcs"))
+  (should (equal (pyim-cstring-to-pinyin "银行传说" nil "-") "yin-hang-chuan-shuo"))
+  (should (equal (pyim-cstring-to-pinyin "银行传说" nil "-" t) '("yin-hang-chuan-shuo")))
+  (should (equal (pyim-cstring-to-pinyin "银行传说" nil "-" t t) '("yin-hang-chuan-shuo")))
+  (should (equal (pyim-cstring-to-pinyin "Hello 银行传说 Hi" nil "-" nil t)
+                 "Hello -yin-hang-chuan-shuo- Hi"))
+  ;; FIXME: 这个 test 是不合理的，不过暂时找不到简单的修复方式。
+  (should (equal (pyim-cstring-to-pinyin "Hello 银行传说 Hi" nil "-" nil nil t)
+                 "Hello -yin-hang-chuan-shuo- Hi")))
 
 (ert-deftest pyim-tests-pyim-cstring-to-xingma ()
   (let ((pyim-dhashcache-word2code (make-hash-table :test #'equal))
@@ -846,18 +892,10 @@
         (quanpin (pyim-scheme-get 'quanpin))
         (wubi (pyim-scheme-get 'wubi))
         (cangjie (pyim-scheme-get 'cangjie)))
-    (should (equal (pyim-cstring-to-codes "行行" quanpin)
-                   '("xing-xing" "xing-heng" "xing-hang"
-                     "heng-xing" "heng-heng" "heng-hang"
-                     "hang-xing" "hang-heng" "hang-hang")))
     (should (equal (pyim-cstring-to-codes "行行" quanpin "xinxin")
                    '("xing-xing")))
     (should (equal (pyim-cstring-to-codes "行行" quanpin "xx")
                    '("xing-xing")))
-    (should (equal (pyim-cstring-to-codes "行行" quanpin "xinhang")
-                   '("xing-hang")))
-    (should (equal (pyim-cstring-to-codes "行行" quanpin "xh")
-                   '("xing-heng")))
 
     (puthash "工" (list "wubi/aaaa" "cangjie/mlm" "gong") pyim-dhashcache-word2code)
     (puthash "房" (list "wubi/yny") pyim-dhashcache-word2code)
@@ -1269,6 +1307,8 @@ wo-hao 我好
   (should (equal (pyim-dhashcache--get-ishortcodes-shortcodes "") nil)))
 
 (ert-deftest pyim-tests-pyim-dhashcache--get-ishortcodes-ishortcodes ()
+  (should (equal (pyim-dhashcache--get-ishortcodes-ishortcodes "ni--hao--") '("n-h")))
+  (should (equal (pyim-dhashcache--get-ishortcodes-ishortcodes "ni--hao") '("n-h")))
   (should (equal (pyim-dhashcache--get-ishortcodes-ishortcodes "ni-hao") '("n-h")))
   (should (equal (pyim-dhashcache--get-ishortcodes-ishortcodes "wubi/aaaa") nil))
   (should (equal (pyim-dhashcache--get-ishortcodes-ishortcodes "ni") '("n")))
@@ -1600,17 +1640,16 @@ Transfer-Encoding: chunked
     (should (pyim-probe-isearch-mode))))
 
 (ert-deftest pyim-tests-pyim-probe-org-speed-commands ()
-  (when (> emacs-major-version 25)
-    (with-temp-buffer
-      (let ((org-use-speed-commands t))
-        (org-mode)
-        (insert "* heading")
-        (goto-char (line-beginning-position))
-        (should (pyim-probe-org-speed-commands))
-        (forward-char 1)
-        (should-not (pyim-probe-org-speed-commands))
-        (forward-char 1)
-        (should-not (pyim-probe-org-speed-commands))))))
+  (with-temp-buffer
+    (let ((org-use-speed-commands t))
+      (org-mode)
+      (insert "* heading")
+      (goto-char (line-beginning-position))
+      (should (pyim-probe-org-speed-commands))
+      (forward-char 1)
+      (should-not (pyim-probe-org-speed-commands))
+      (forward-char 1)
+      (should-not (pyim-probe-org-speed-commands)))))
 
 (ert-deftest pyim-tests-pyim-probe-org-structure-template ()
   (with-temp-buffer
@@ -1703,25 +1742,21 @@ Transfer-Encoding: chunked
     (should (pyim-probe-punctuation-after-punctuation ?.))))
 
 (ert-deftest pyim-tests-pyim-probe-org-latex-mode ()
-  (when (> emacs-major-version 25)
-    (with-temp-buffer
-      (org-mode)
-      (insert "\\begin{equation}")
-      (save-excursion
-        (insert "\\end{equation}"))
-      (should (pyim-probe-org-latex-mode))
+  (with-temp-buffer
+    (org-mode)
+    (insert "\\begin{equation}")
+    (save-excursion
+      (insert "\\end{equation}"))
+    (should (pyim-probe-org-latex-mode))
 
-      (erase-buffer)
-      (insert "$$")
-      (backward-char 1)
-      (should (pyim-probe-org-latex-mode))
+    (erase-buffer)
+    (insert "$$")
+    (backward-char 1)
+    (should (pyim-probe-org-latex-mode))
 
-      (erase-buffer)
-      (insert "\\documentclass{article}")
-      (should (pyim-probe-org-latex-mode))))
-
-  (when (< emacs-major-version 26)
-    (should-not (pyim-probe-org-latex-mode))))
+    (erase-buffer)
+    (insert "\\documentclass{article}")
+    (should (pyim-probe-org-latex-mode))))
 
 (ert-deftest pyim-tests-pyim-probe-exwm-xim-environment ()
   (with-temp-buffer

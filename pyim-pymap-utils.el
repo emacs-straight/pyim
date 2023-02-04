@@ -378,6 +378,47 @@
   (< (or (cl-position a pyim-pymap--commonly-used-cchar :test #'equal) 1000000)
      (or (cl-position b pyim-pymap--commonly-used-cchar :test #'equal) 1000000)))
 
+(defvar pyim-dhashcache-code2word)
+
+(defun pyim-pymap-get-duoyinzi-words ()
+  (interactive)
+
+  (pyim-pymap--py2duoyinzi-cache-create t)
+
+  (let (code2word output)
+    (maphash
+     (lambda (key value)
+       (let* ((pys (split-string key "-"))
+              (length (length pys)))
+         (when (and (> length 1)
+                    (< length 3))
+           (push (cons pys value) code2word))))
+     pyim-dhashcache-code2word)
+
+    (dolist (x code2word)
+      (let ((words (cdr x)))
+        (dolist (word words)
+          (let ((chars (remove "" (split-string word "")))
+                (i 0))
+            (dolist (char chars)
+              (when-let* (;; 找到这个汉字所有得拼音
+                          (char-pinyins (pyim-pymap-cchar2py-get char))
+                          ;; 判断是不是多音字
+                          (lengthp (> (length char-pinyins) 1))
+                          ;; 剔除已经设置为 fallback 拼音
+                          (char-pinyins (cl-remove-if
+                                         (lambda (py)
+                                           (member char (pyim-pymap--py2duoyinzi-get py t)))
+                                         char-pinyins))
+                          ;; 找到 code2word 词库中，这个字对应得拼音
+                          (pinyin (nth i (car x)))
+                          ;; 看这个拼音是否需要特殊处理
+                          (need (member pinyin char-pinyins)))
+                (setf (alist-get pinyin output nil nil #'equal)
+                      (sort (delete-dups `(,@(alist-get pinyin output nil nil #'equal) ,word)) #'string<)))
+              (setq i (1+ i)))))))
+
+    (pp (sort output (lambda (a b) (string< (car a) (car b)))))))
 
 ;; * Footer
 (provide 'pyim-pymap-utils)
