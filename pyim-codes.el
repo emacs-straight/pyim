@@ -1,7 +1,7 @@
 ;;; pyim-codes.el --- codes lib for pyim.        -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2021 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2026 Free Software Foundation, Inc.
 
 ;; Author: Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>

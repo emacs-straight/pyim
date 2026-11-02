@@ -1,7 +1,7 @@
 ;;; pyim-probe.el --- Auto-Switch-to-English-Input probes for pyim  -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2015-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2026 Free Software Foundation, Inc.
 
 ;; Author: Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>

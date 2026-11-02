@@ -1,7 +1,7 @@
 ;;; pyim-pymap-utils.el --- Utils used to develop pyim-pymap.el file  -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2015-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2026 Free Software Foundation, Inc.
 
 ;; Author: Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>

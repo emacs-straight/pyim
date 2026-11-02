@@ -1,7 +1,7 @@
 ;;; pyim.el --- A Chinese input method support quanpin, shuangpin, wubi, cangjie and rime.        -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2015-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2026 Free Software Foundation, Inc.
 
 ;; Author: Ye Wenbin <wenbinye@163.com>
 ;;         Feng Shu <tumashu@163.com>
@@ -217,7 +217,7 @@ pyim 使用函数 `pyim-activate' 启动输入法的时候，会将变量
   "Pyim 从 minibuffer 退出."
   (deactivate-input-method)
   (when (<= (minibuffer-depth) 1)
-    (remove-hook 'minibuffer-exit-hook 'pyim-exit-from-minibuffer)))
+    (remove-hook 'minibuffer-exit-hook #'pyim-exit-from-minibuffer)))
 
 ;; ** pyim 重启功能
 (defun pyim-restart ()

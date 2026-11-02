@@ -1,7 +1,7 @@
 ;;; pyim-common.el --- common utilities for pyim    -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2015-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2026 Free Software Foundation, Inc.
 
 ;; Author: Feng Shu <tumashu@163.com>
 ;; Maintainer: Feng Shu <tumashu@163.com>
@@ -161,7 +161,7 @@ When CARE-FIRST-ONE is no-nil, ((a b c) (d e)) => (a d)."
    (pyim-char-before-to-string num)))
 
 (if (fboundp 'string-distance)
-    (defalias 'pyim-string-distance 'string-distance)
+    (defalias 'pyim-string-distance #'string-distance)
   (defun pyim-string-distance (s1 s2)
     "Return the edit (levenshtein) distance between strings S1 S2."
     (let* ((l1 (length s1))

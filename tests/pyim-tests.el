@@ -1,7 +1,7 @@
 ;;; pyim-tests.el ---  unit tests for pyim -*- lexical-binding: t; -*-
 
 ;; * Header
-;; Copyright (C) 2019-2021 Free Software Foundation, Inc.
+;; Copyright (C) 2019-2026 Free Software Foundation, Inc.
 
 ;; Author: Chen Bin <chenbin.sh@gmail.com>
 ;; Maintainer: Chen Bin <chenbin.sh@gmail.com>
@@ -527,6 +527,7 @@
 
 ;; ** pyim-codes 相关单元测试
 (ert-deftest pyim-tests-pyim-codes ()
+  (defvar pyim-shuangpin)
   (let ((quanpin (pyim-scheme-get 'quanpin))
         (wubi (pyim-scheme-get 'wubi))
         (cangjie (pyim-scheme-get 'cangjie))
@@ -1144,7 +1145,7 @@
 测嘊 34567
 测伌")
         (write-file file))
-      (pyim-import-words-and-counts file (lambda (orig-count new-count) new-count) t)
+      (pyim-import-words-and-counts file (lambda (_orig-count new-count) new-count) t)
 
       ;; 测试词条是否存在
       (dolist (x '("测㤅" "测嘊" "测伌"))
@@ -1353,8 +1354,7 @@ zuo-zuo-you-mang 作作有芒")
 (ert-deftest pyim-tests-pyim-dhashcache--update-shortcode2word ()
   (let ((pyim-dhashcache-iword2count (make-hash-table :test #'equal))
         (code2word (make-hash-table :test #'equal))
-        (shortcode2word (make-hash-table :test #'equal))
-        output)
+        (shortcode2word (make-hash-table :test #'equal)))
 
     (puthash "wubi/a" '("戈") code2word)
     (puthash "wubi/aa" '("式" "藏") code2word)
@@ -1641,6 +1641,7 @@ Transfer-Encoding: chunked
 
 (ert-deftest pyim-tests-pyim-probe-org-speed-commands ()
   (with-temp-buffer
+    (defvar org-use-speed-commands)
     (let ((org-use-speed-commands t))
       (org-mode)
       (insert "* heading")
@@ -2186,9 +2187,9 @@ abc 这是")))
   (let* ((result1 nil)
          (result2 nil)
          (pyim-process-ui-refresh-hook
-          (list (lambda (x)
+          (list (lambda (_)
                   (setq result1 "result1"))
-                (lambda (x)
+                (lambda (_)
                   (setq result2 "result2")))))
     (pyim-process-ui-refresh)
     (should (equal result1 "result1"))
